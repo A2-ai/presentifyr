@@ -1,16 +1,16 @@
-# pptx
+# presentifyr
 
 <!-- badges: start -->
 
 <!-- badges: end -->
 
-The goal of pptx is to automate creation of PowerPoints for outputs for internal reviews or report reference purposes.
+The goal of presentifyr is to automate creation of PowerPoints for outputs for internal reviews or report reference purposes.
 
 ## Installation
 
-To install the development version of pptx:
+To install the development version of presentifyr:
 
-1.  In your general project directory, `gh repo clone A2-ai/pptx`
+1.  In your general project directory, `gh repo clone A2-ai/presentifyr`
 
 2a. For projects with renv snapshots of 2024-07-20 or later: Within the project you want to use the app (run these separately):
 
@@ -19,14 +19,14 @@ install.packages("devtools") # if not already installed
 ```
 
 ``` r
-devtools::load_all("../pptx") # for directory organization where your project directory is Projects/<project>; otherwise, devtools::load_all("path/to/pptx/repo")
+devtools::load_all("../presentifyr") # for directory organization where your project directory is Projects/<project>; otherwise, devtools::load_all("path/to/presentifyr/repo")
 ```
 
 ```r
 app()
 ```
 
-2b. For projects with renv snapshots prior to 2024-07-20: Within the pptx project:
+2b. For projects with renv snapshots prior to 2024-07-20: Within the presentifyr project:
 
 ``` r
 renv::restore() 

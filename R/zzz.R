@@ -1,7 +1,7 @@
 #' @importFrom shiny addResourcePath
 #' @noRd
 .onLoad <- function(...) {
-  shiny::addResourcePath("pptx", system.file(".", package = "pptx"))
+  shiny::addResourcePath("presentifyr", system.file(".", package = "presentifyr"))
 }
 
 .onAttach <- function(...){
@@ -10,7 +10,7 @@
 }
 
 .onUnload <- function(...) {
-  shiny::removeResourcePath("pptx")
+  shiny::removeResourcePath("presentifyr")
 }
 
 #' Generates a tidyverse-esque onAttach message

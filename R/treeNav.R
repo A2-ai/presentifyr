@@ -116,8 +116,8 @@ treeNavigatorUI <- function(id, width = "100%", height = "auto") {
   tree <- jstreeOutput(outputId = id, width = width, height = height)
   tagList(
     tree,
-    tags$link(rel = "stylesheet", type = "text/css", href = "pptx/tree.css"),
-    tags$script(type = "module", src = "pptx/tree.js")
+    tags$link(rel = "stylesheet", type = "text/css", href = "presentifyr/tree.css"),
+    tags$script(type = "module", src = "presentifyr/tree.js")
   )
 }
 

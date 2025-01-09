@@ -1,15 +1,16 @@
-Package: pptx
-Title: What the Package Does (One Line, Title Case)
+Package: presentifyr
+Title: Creates and updates reproducible powerpoints
 Version: 0.0.0.9000
 Authors@R: 
     person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
 Description: Selects image files to write to pptx with their associated github link in the note section.
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
+Depends: 
+    R (>= 2.10)
 Imports: 
     bslib (>= 0.7.0),
     fs (>= 1.6.4),
@@ -22,3 +23,8 @@ Imports:
     purrr (>= 1.0.2),
     shiny (>= 1.8.1.1),
     withr (>= 3.0.0)
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+LazyData: true
+VignetteBuilder: knitr

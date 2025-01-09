@@ -40,11 +40,11 @@ add_images_to_ppt <- function(files, repo_url, output_pptx, base_pptx = "default
   base_pptx_path <- switch(
     base_pptx,
     "default" = "None", # Pass "None" explicitly to the Python script for blank presentation
-    "a2_ai" = system.file("templates/a2_ai_temp.pptx", package = "pptx"),
+    "a2_ai" = system.file("templates/a2_ai_temp.pptx", package = "presentifyr"),
     stop("Invalid base_pptx value. Choose either 'default' or a valid template like 'a2_ai'.")
   )
 
-  script <- system.file("scripts/add_images.py", package = "pptx")
+  script <- system.file("scripts/add_images.py", package = "presentifyr")
   args <- c("run", script, "-f", files, "-r", repo_url, "-o", output_pptx, "-b", base_pptx_path)
 
   if (is.null(getOption("venv_dir"))) {
@@ -97,7 +97,7 @@ sync_images <- function(pptx_in,
   temp_image_dict <- tempfile(fileext = ".json")
   jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
 
-  script <- system.file("scripts/sync_images.py", package = "pptx")
+  script <- system.file("scripts/sync_images.py", package = "presentifyr")
   args <- c("run", script, "-i", pptx_in, "-o", pptx_out, "-d", temp_image_dict)
 
   if (is.null(getOption("venv_dir"))) {

@@ -6,7 +6,7 @@
 #' initialize_python()
 #' }
 initialize_python <- function() {
-  cmd <- system.file("scripts/uv_setup.sh", package = "pptx")
+  cmd <- system.file("scripts/uv_setup.sh", package = "presentifyr")
 
   if (is.null(getOption("venv_dir"))) {
     options("venv_dir" = here::here())
