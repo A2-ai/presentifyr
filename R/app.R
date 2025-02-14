@@ -38,8 +38,6 @@ pptx_server <- function(id) {
       ns <- NS(id)
       rv <- reactiveValues(
         template = "default",
-        height = 0,
-        width = 0,
         uploaded_file = NULL,
         processed_file = NULL
       )
@@ -50,15 +48,7 @@ pptx_server <- function(id) {
           title = "Customize PPTX Configuration",
           uiOutput(ns("configs_options")),
           hr(),
-          tags$p("Adjusting the dimensions will have the image print centered in the blank layout of the chosen pptx template.
-                Leaving the height and/or width at 0 will cause the image to expand to fill the size of the entire slide (10x7.5 for default and 10x5.63 for A2-Ai).
-                See repo readme for how to mass format slides."),
-          tags$p("Some common dimensions used for quarto outputs are found below:"),
-          tableOutput(ns("figure_options_table")),
-          tags$p("For more details, visit the ",
-                 tags$a(href = "https://quarto.org/docs/computations/execution-options.html#figure-options",
-                        "Quarto Figure Options Documentation", target = "_blank"),
-                 ".")
+          tags$p("Please upload a PPTX template to use.")
         ))
       })
 
@@ -66,7 +56,7 @@ pptx_server <- function(id) {
       observeEvent(input$sync, {
         showModal(modalDialog(
           title = "Sync Images",
-          tags$p("Use this menu to sync your PPTX with a remote repository."),
+          tags$p("Use this menu to sync your PPTX with a local repository."),
           actionButton(ns("open_upload"), "Upload File"),
         ))
       })
@@ -149,28 +139,15 @@ pptx_server <- function(id) {
         tagList(
           selectInput(ns("template"), "Choose Template:", selected = rv$template,
                       choices = c("Blank Template" = "default", "A2-Ai Template" = "a2_ai")),
-          numericInput(ns("height"), "Height (inches):", value = rv$height, min = 0),
-          numericInput(ns("width"), "Width (inches):", value = rv$width, min = 0),
           footer = tagList(
             actionButton(ns("confirm"), "Apply")
           )
         )
       })
 
-      output$figure_options_table <- renderTable({
-        data.frame(
-          Format = c("Default", "HTML Slides", "HTML Slides (reveal.js)", "PDF", "PDF Slides (Beamer)",
-                     "PowerPoint", "MS Word, ODT, RTF", "EPUB"),
-          Default = c("7 x 5", "9.5 x 6.5", "9 x 5", "5.5 x 3.5", "10 x 7",
-                      "7.5 x 5.5", "5 x 4", "5 x 4")
-        )
-      }, striped = TRUE, hover = TRUE, bordered = TRUE)
-
       # Confirm Configurations
       observeEvent(input$confirm, {
         rv$template <- input$template
-        rv$height <- input$height
-        rv$width <- input$width
         removeModal()
       })
 
@@ -207,9 +184,7 @@ pptx_server <- function(id) {
             remote_url = remote_url,
             files = selected_items(),
             output_pptx = temp_pptx,
-            base_pptx = rv$template,
-            height = rv$height,
-            width = rv$width
+            base_pptx = rv$template
           ))
 
           file.copy(temp_pptx, file)

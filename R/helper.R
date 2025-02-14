@@ -35,7 +35,7 @@ get_current_branch <- function() {
   return(current_branch)
 }
 
-add_images_to_ppt <- function(files, repo_url, output_pptx, base_pptx = "default", height = 0, width = 0) {
+add_images_to_ppt <- function(files, repo_url, output_pptx, base_pptx = "default") {
 
   base_pptx_path <- switch(
     base_pptx,
@@ -69,7 +69,7 @@ add_images_to_ppt <- function(files, repo_url, output_pptx, base_pptx = "default
   })
 }
 
-create_pptx_with_images <- function(files, remote_url = gert::git_remote_info()$url, output_pptx, base_pptx = "default", height = 0, width = 0) {
+create_pptx_with_images <- function(files, remote_url = gert::git_remote_info()$url, output_pptx, base_pptx = "default") {
   # Convert SSH URL to HTTPS URL if needed
   repo_url <- clean_url(remote_url)
 
@@ -78,7 +78,7 @@ create_pptx_with_images <- function(files, remote_url = gert::git_remote_info()$
 
   repo_url <- paste0(repo_url, "/blob/", current_branch)
 
-  add_images_to_ppt(files, repo_url, output_pptx, base_pptx, height, width)
+  add_images_to_ppt(files, repo_url, output_pptx, base_pptx)
 }
 
 sync_images <- function(pptx_in,
