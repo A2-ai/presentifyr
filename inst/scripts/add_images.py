@@ -6,15 +6,17 @@ def log_message(message, log_file="script.log"):
     with open(log_file, "a") as log:
         log.write(f"{message}\n")
 
-def add_images_to_ppt(files, repo_url, output_pptx, base_pptx="None", log_file="script.log"):
-    if base_pptx != "None":
+def add_images_to_ppt(files, repo_url, output_pptx, base_pptx=None, log_file="script.log"):
+    if base_pptx is not None and os.path.exists(base_pptx):
+        # If base_pptx is provided and valid
         log_message(f"Using base PowerPoint template: {base_pptx}", log_file)
-        my_pres = Presentation(base_pptx)
+        my_pres = Presentation(base_pptx)  # Load user-uploaded template
         slide_layout_index = 3
     else:
+        # If no base_pptx is provided (None passed), create a blank presentation
         log_message("Creating a new blank PowerPoint presentation.", log_file)
-        my_pres = Presentation()
-        slide_layout_index = 8
+        my_pres = Presentation()  # Create a blank PowerPoint
+        slide_layout_index = 8  # Use a blank slide layout for the new presentation
 
     total_files = len(files)
     log_message(f"Total files to process: {total_files}", log_file)
@@ -55,7 +57,6 @@ def add_images_to_ppt(files, repo_url, output_pptx, base_pptx="None", log_file="
                     'p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
                     'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'
                 }
-                # Find the last <p:pic> element in the slide (likely the newly added one)
                 pic_element = slide._element.findall('.//p:pic', namespaces)[-1]
 
                 # Find the <p:cNvPr> element and set the alt text
@@ -84,7 +85,7 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--files', nargs='+', type=str, required=True, help="Files")
     parser.add_argument('-r', '--repo_url', type=str, required=True, help="Repo URL")
     parser.add_argument('-o', '--output', type=str, required=True, help="Output pptx file path")
-    parser.add_argument('-b', '--base_pptx', type=str, required=False, default="None", help="Base PowerPoint template (optional)")
+    parser.add_argument('-b', '--base_pptx', type=str, required=False, default=None, help="Base PowerPoint template (optional)")
 
     args = parser.parse_args()
 

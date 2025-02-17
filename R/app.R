@@ -42,47 +42,47 @@ pptx_server <- function(id) {
         processed_file = NULL
       )
 
-      # Configurations Modal
+      # Configurations Modal for uploading a template
       observeEvent(input$configs, {
         showModal(modalDialog(
           title = "Customize PPTX Configuration",
           uiOutput(ns("configs_options")),
           hr(),
-          tags$p("Please upload a PPTX template to use.")
+          tags$p("Please upload a PPTX template to use for adding images.")
         ))
       })
 
-      # Sync Modal
+      # Sync Modal for syncing images
       observeEvent(input$sync, {
         showModal(modalDialog(
           title = "Sync Images",
           tags$p("Use this menu to sync your PPTX with a local repository."),
-          actionButton(ns("open_upload"), "Upload File"),
+          actionButton(ns("open_upload_sync"), "Upload File")
         ))
       })
 
-      # Upload Modal
-      observeEvent(input$open_upload, {
-        # Close the Sync modal when opening the Upload modal
+      # Upload Modal for Config (Template Upload)
+      observeEvent(input$open_upload_sync, {
+        # Close the sync modal and open the upload modal for syncing
         removeModal()
         showModal(modalDialog(
-          title = "Upload a File",
-          fileInput(ns("uploaded_file"), "Choose a File:", accept = ".pptx"),
+          title = "Upload PPTX for Syncing",
+          fileInput(ns("uploaded_sync_file"), "Choose a PPTX File for Syncing:", accept = ".pptx"),
           footer = tagList(
-            actionButton(ns("submit_file"), "Submit"),
+            actionButton(ns("submit_sync_file"), "Submit Sync File"),
             modalButton("Cancel")
           )
         ))
       })
 
-      # Handle Uploaded File and Process Immediately
-      observeEvent(input$submit_file, {
-        rv$uploaded_file <- input$uploaded_file
+      # Handle Sync Upload (for Syncing Images)
+      observeEvent(input$submit_sync_file, {
+        rv$uploaded_file <- input$uploaded_sync_file
 
         if (is.null(rv$uploaded_file)) {
           showModal(modalDialog(
             title = "Error",
-            "No file was uploaded. Please try again.",
+            "No PPTX file was uploaded for syncing. Please try again.",
             footer = NULL
           ))
           return()
@@ -93,13 +93,13 @@ pptx_server <- function(id) {
 
         # Show processing modal
         showModal(modalDialog(
-          title = "Processing File",
-          "Your file is being processed. This may take a few moments.",
+          title = "Processing Sync",
+          "Your PPTX file is being synced. This may take a few moments.",
           footer = NULL
         ))
 
         tryCatch({
-          # Call the utility function to replace images
+          # Call the utility function to replace images in the PPTX
           sync_images(pptx_in, pptx_out)
 
           # Save the processed file path for download
@@ -134,20 +134,32 @@ pptx_server <- function(id) {
         })
       })
 
-      # Configurations Options UI
+      # Configurations Options UI for the Template Upload
       output$configs_options <- renderUI({
         tagList(
-          selectInput(ns("template"), "Choose Template:", selected = rv$template,
-                      choices = c("Blank Template" = "default", "A2-Ai Template" = "a2_ai")),
+          fileInput(ns("uploaded_template"), "Choose a PPTX Template for Adding Images:", accept = ".pptx"),  # Upload field for template
           footer = tagList(
-            actionButton(ns("confirm"), "Apply")
+            actionButton(ns("submit_template"), "Submit Template"),
+            modalButton("Cancel")
           )
         )
       })
 
-      # Confirm Configurations
-      observeEvent(input$confirm, {
-        rv$template <- input$template
+      # Handle Template Upload for Add Images
+      observeEvent(input$submit_template, {
+        rv$uploaded_template <- input$uploaded_template
+
+        if (is.null(rv$uploaded_template)) {
+          showModal(modalDialog(
+            title = "Error",
+            "No template file was uploaded. A blank template will be used instead.",
+            footer = NULL
+          ))
+          return()
+        }
+
+        # Update the template with the uploaded template for add_images functionality
+        rv$template <- rv$uploaded_template$datapath
         removeModal()
       })
 
@@ -180,11 +192,14 @@ pptx_server <- function(id) {
           showModal(modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
           start_time <- Sys.time()
 
+          # Use the uploaded template, or the default if not uploaded
+          base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath else rv$template
+
           suppressWarnings(create_pptx_with_images(
             remote_url = remote_url,
             files = selected_items(),
             output_pptx = temp_pptx,
-            base_pptx = rv$template
+            base_pptx = base_pptx
           ))
 
           file.copy(temp_pptx, file)
