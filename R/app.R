@@ -1,4 +1,5 @@
 options(shiny.maxRequestSize = 1000*1024^2)
+
 #' @import shiny
 #' @import bslib
 NULL
@@ -37,8 +38,9 @@ pptx_server <- function(id) {
     function(input, output, session) {
       ns <- NS(id)
       rv <- reactiveValues(
-        template = "default",
-        uploaded_file = NULL,
+        template = "default",  # Default template for the add_images functionality
+        uploaded_template = NULL,  # To store the uploaded template for add_images
+        uploaded_file = NULL,  # For the sync functionality
         processed_file = NULL
       )
 
@@ -48,7 +50,8 @@ pptx_server <- function(id) {
           title = "Customize PPTX Configuration",
           uiOutput(ns("configs_options")),
           hr(),
-          tags$p("Please upload a PPTX template to use for adding images.")
+          tags$p("Please use the following to clear a provided PPTX template:"),
+          actionButton(ns("clear_template"), "Clear Template", class = "btn-danger")  # Clear Template button
         ))
       })
 
@@ -163,6 +166,38 @@ pptx_server <- function(id) {
         removeModal()
       })
 
+      # Clear Template Button functionality
+      observeEvent(input$clear_template, {
+        showModal(modalDialog(
+          title = "Clear Template",
+          "Are you sure you want to clear the current template and use a blank template?",
+          footer = tagList(
+            actionButton(ns("confirm_clear"), "Yes, Clear Template"),
+            modalButton("Cancel")
+          )
+        ))
+      })
+
+      # Confirm the action to clear the template
+      observeEvent(input$confirm_clear, {
+        # If an uploaded template exists, remove it
+        if (!is.null(rv$uploaded_template) && file.exists(rv$uploaded_template$datapath)) {
+          file.remove(rv$uploaded_template$datapath)
+        }
+
+        # Reset the template variables
+        rv$uploaded_template <- NULL
+        rv$template <- "default"  # Set to the blank template
+
+        removeModal()
+
+        showModal(modalDialog(
+          title = "Template Cleared",
+          "The uploaded template has been removed, and a blank template will be used instead.",
+          footer = modalButton("Close")
+        ))
+      })
+
       observe({
         tryCatch({
           gert::git_remote_info()$url
@@ -228,7 +263,6 @@ pptx_server <- function(id) {
     }
   )
 }
-
 
 app_ui <- function() {
   pptx_ui(id = "app")
