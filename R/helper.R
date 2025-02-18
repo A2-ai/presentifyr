@@ -67,7 +67,8 @@ add_images_to_ppt <- function(files, repo_url, output_pptx, base_pptx = NULL) {
   # Run the Python script to add images to PowerPoint
   result <- tryCatch({
     processx::run(
-      command = uv_path, args = args, env = c("current", VIRTUAL_ENV = venv_path), error_on_status = TRUE
+      command = uv_path, args = args, env = c("current", VIRTUAL_ENV = venv_path), error_on_status = TRUE,
+      echo = TRUE,
     )
   }, error = function(e) {
     stop(paste("Add images script failed. Status: ", e$status, "Stderr: ", e$stderr))
@@ -87,7 +88,7 @@ create_pptx_with_images <- function(files, remote_url = gert::git_remote_info()$
 }
 
 sync_images <- function(pptx_in,
-                        pptx_out) {
+                        output_pptx) {
 
   image_files <- parse_directory_for_images(
     directory = here::here(),
@@ -103,7 +104,7 @@ sync_images <- function(pptx_in,
   jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
 
   script <- system.file("scripts/sync_images.py", package = "presentifyr")
-  args <- c("run", script, "-i", pptx_in, "-o", pptx_out, "-d", temp_image_dict)
+  args <- c("run", script, "-i", pptx_in, "-o", output_pptx, "-d", temp_image_dict)
 
   if (is.null(getOption("venv_dir"))) {
     message("Setting options('venv_dir') to project root.")
@@ -120,7 +121,8 @@ sync_images <- function(pptx_in,
 
     result <- tryCatch({
       processx::run(
-        command = uv_path, args = args, env = c("current", VIRTUAL_ENV = venv_path), error_on_status = TRUE
+        command = uv_path, args = args, env = c("current", VIRTUAL_ENV = venv_path), error_on_status = TRUE,
+        echo = TRUE,
       )
     }, error = function(e) {
       stop(paste("Sync images script failed. Status: ", e$status, "Stderr: ", e$stderr))

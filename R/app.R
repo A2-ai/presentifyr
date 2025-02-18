@@ -92,7 +92,7 @@ pptx_server <- function(id) {
         }
 
         pptx_in <- rv$uploaded_file$datapath
-        pptx_out <- tempfile(fileext = ".pptx")
+        output_pptx <- tempfile(fileext = ".pptx")
 
         # Show processing modal
         showModal(modalDialog(
@@ -103,10 +103,10 @@ pptx_server <- function(id) {
 
         tryCatch({
           # Call the utility function to replace images in the PPTX
-          sync_images(pptx_in, pptx_out)
+          sync_images(pptx_in, output_pptx)
 
           # Save the processed file path for download
-          rv$processed_file <- pptx_out
+          rv$processed_file <- output_pptx
 
           # Success modal
           showModal(modalDialog(
