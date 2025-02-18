@@ -91,4 +91,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    add_images_to_ppt(args.files, args.repo_url, args.output, base_pptx=args.base_pptx, log_level="DEBUG")
+    add_images_to_ppt(args.files, args.repo_url, args.output, base_pptx=args.base_pptx)
