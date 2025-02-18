@@ -6,15 +6,31 @@ def log_message(message, log_file="script.log"):
     with open(log_file, "a") as log:
         log.write(f"{message}\n")
 
-def add_images_to_ppt(files, repo_url, output_pptx, base_pptx="None", log_file="script.log"):
-    if base_pptx != "None":
+def add_images_to_ppt(files, repo_url, output_pptx, base_pptx=None, log_file="script.log"):
+    if base_pptx is not None and os.path.exists(base_pptx):
+        # If base_pptx is provided and valid
         log_message(f"Using base PowerPoint template: {base_pptx}", log_file)
-        my_pres = Presentation(base_pptx)
-        slide_layout_index = 3
+        my_pres = Presentation(base_pptx)  # Load user-uploaded template
     else:
-        log_message("Creating a new blank PowerPoint presentation.", log_file)
-        my_pres = Presentation()
-        slide_layout_index = 8
+        # If no base_pptx is provided or it's invalid, create a blank PowerPoint presentation
+        log_message("No PowerPoint template provided or invalid template. Creating a blank PowerPoint presentation.", log_file)
+        my_pres = Presentation()  # Create a blank PowerPoint
+
+    # Always scan for slide layout with placeholder type 18
+    slide_layout_index = None
+    for idx, layout in enumerate(my_pres.slide_layouts):
+        for shape in layout.shapes:
+            if shape.is_placeholder and shape.placeholder_format.type == 18:
+                slide_layout_index = idx  # Set the layout index where the placeholder type 18 is found
+                log_message(f"Found layout {slide_layout_index} with placeholder type 18.", log_file)
+                break
+        if slide_layout_index is not None:
+            break
+
+    # If no suitable layout is found, raise an error instead of defaulting
+    if slide_layout_index is None:
+        log_message("No slide layout with placeholder type 18 found.", log_file)
+        raise ValueError("No slide layout with the correct placeholder type (18) found in the PowerPoint template or blank presentation.")
 
     total_files = len(files)
     log_message(f"Total files to process: {total_files}", log_file)
@@ -26,7 +42,7 @@ def add_images_to_ppt(files, repo_url, output_pptx, base_pptx="None", log_file="
 
         log_message(f"Creating slide {i} of {total_files}...", log_file)
 
-        # Add a new slide with the appropriate layout
+        # Add a new slide with the appropriate layout (determined dynamically)
         slide = my_pres.slides.add_slide(my_pres.slide_layouts[slide_layout_index])
         
         for shape in slide.shapes:
@@ -55,7 +71,6 @@ def add_images_to_ppt(files, repo_url, output_pptx, base_pptx="None", log_file="
                     'p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
                     'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'
                 }
-                # Find the last <p:pic> element in the slide (likely the newly added one)
                 pic_element = slide._element.findall('.//p:pic', namespaces)[-1]
 
                 # Find the <p:cNvPr> element and set the alt text
@@ -84,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--files', nargs='+', type=str, required=True, help="Files")
     parser.add_argument('-r', '--repo_url', type=str, required=True, help="Repo URL")
     parser.add_argument('-o', '--output', type=str, required=True, help="Output pptx file path")
-    parser.add_argument('-b', '--base_pptx', type=str, required=False, default="None", help="Base PowerPoint template (optional)")
+    parser.add_argument('-b', '--base_pptx', type=str, required=False, help="Base PowerPoint template (optional)")
 
     args = parser.parse_args()
 

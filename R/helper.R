@@ -35,18 +35,22 @@ get_current_branch <- function() {
   return(current_branch)
 }
 
-add_images_to_ppt <- function(files, repo_url, output_pptx, base_pptx = "default", height = 0, width = 0) {
+add_images_to_ppt <- function(files, repo_url, output_pptx, base_pptx = NULL) {
 
-  base_pptx_path <- switch(
-    base_pptx,
-    "default" = "None", # Pass "None" explicitly to the Python script for blank presentation
-    "a2_ai" = system.file("templates/a2_ai_temp.pptx", package = "presentifyr"),
-    stop("Invalid base_pptx value. Choose either 'default' or a valid template like 'a2_ai'.")
-  )
+  # If an uploaded template is provided, use its path; otherwise, use "None" for a blank presentation
+  base_pptx_path <- if (!is.null(base_pptx)) {
+    base_pptx  # This will be the user-uploaded PPTX file path
+  } else {
+    "None"  # Use a blank presentation if no template is uploaded
+  }
 
+  # Define the path to the Python script
   script <- system.file("scripts/add_images.py", package = "presentifyr")
+
+  # Set up arguments for the Python script
   args <- c("run", script, "-f", files, "-r", repo_url, "-o", output_pptx, "-b", base_pptx_path)
 
+  # Ensure virtual environment path is set
   if (is.null(getOption("venv_dir"))) {
     message("Setting options('venv_dir') to project root.")
     options("venv_dir" = here::here())
@@ -60,6 +64,7 @@ add_images_to_ppt <- function(files, repo_url, output_pptx, base_pptx = "default
 
   uv_path <- get_uv_path()
 
+  # Run the Python script to add images to PowerPoint
   result <- tryCatch({
     processx::run(
       command = uv_path, args = args, env = c("current", VIRTUAL_ENV = venv_path), error_on_status = TRUE
@@ -69,7 +74,7 @@ add_images_to_ppt <- function(files, repo_url, output_pptx, base_pptx = "default
   })
 }
 
-create_pptx_with_images <- function(files, remote_url = gert::git_remote_info()$url, output_pptx, base_pptx = "default", height = 0, width = 0) {
+create_pptx_with_images <- function(files, remote_url = gert::git_remote_info()$url, output_pptx, base_pptx = "default") {
   # Convert SSH URL to HTTPS URL if needed
   repo_url <- clean_url(remote_url)
 
@@ -78,7 +83,7 @@ create_pptx_with_images <- function(files, remote_url = gert::git_remote_info()$
 
   repo_url <- paste0(repo_url, "/blob/", current_branch)
 
-  add_images_to_ppt(files, repo_url, output_pptx, base_pptx, height, width)
+  add_images_to_ppt(files, repo_url, output_pptx, base_pptx)
 }
 
 sync_images <- function(pptx_in,

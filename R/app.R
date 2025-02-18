@@ -1,4 +1,5 @@
 options(shiny.maxRequestSize = 1000*1024^2)
+
 #' @import shiny
 #' @import bslib
 NULL
@@ -37,62 +38,54 @@ pptx_server <- function(id) {
     function(input, output, session) {
       ns <- NS(id)
       rv <- reactiveValues(
-        template = "default",
-        height = 0,
-        width = 0,
-        uploaded_file = NULL,
+        template = "default",  # Default template for the add_images functionality
+        uploaded_template = NULL,  # To store the uploaded template for add_images
+        uploaded_file = NULL,  # For the sync functionality
         processed_file = NULL
       )
 
-      # Configurations Modal
+      # Configurations Modal for uploading a template
       observeEvent(input$configs, {
         showModal(modalDialog(
           title = "Customize PPTX Configuration",
           uiOutput(ns("configs_options")),
           hr(),
-          tags$p("Adjusting the dimensions will have the image print centered in the blank layout of the chosen pptx template.
-                Leaving the height and/or width at 0 will cause the image to expand to fill the size of the entire slide (10x7.5 for default and 10x5.63 for A2-Ai).
-                See repo readme for how to mass format slides."),
-          tags$p("Some common dimensions used for quarto outputs are found below:"),
-          tableOutput(ns("figure_options_table")),
-          tags$p("For more details, visit the ",
-                 tags$a(href = "https://quarto.org/docs/computations/execution-options.html#figure-options",
-                        "Quarto Figure Options Documentation", target = "_blank"),
-                 ".")
+          tags$p("Please use the following to clear a provided PPTX template:"),
+          actionButton(ns("clear_template"), "Clear Template", class = "btn-danger")  # Clear Template button
         ))
       })
 
-      # Sync Modal
+      # Sync Modal for syncing images
       observeEvent(input$sync, {
         showModal(modalDialog(
           title = "Sync Images",
-          tags$p("Use this menu to sync your PPTX with a remote repository."),
-          actionButton(ns("open_upload"), "Upload File"),
+          tags$p("Use this menu to sync your PPTX with a local repository."),
+          actionButton(ns("open_upload_sync"), "Upload File")
         ))
       })
 
-      # Upload Modal
-      observeEvent(input$open_upload, {
-        # Close the Sync modal when opening the Upload modal
+      # Upload Modal for Config (Template Upload)
+      observeEvent(input$open_upload_sync, {
+        # Close the sync modal and open the upload modal for syncing
         removeModal()
         showModal(modalDialog(
-          title = "Upload a File",
-          fileInput(ns("uploaded_file"), "Choose a File:", accept = ".pptx"),
+          title = "Upload PPTX for Syncing",
+          fileInput(ns("uploaded_sync_file"), "Choose a PPTX File for Syncing:", accept = ".pptx"),
           footer = tagList(
-            actionButton(ns("submit_file"), "Submit"),
+            actionButton(ns("submit_sync_file"), "Submit Sync File"),
             modalButton("Cancel")
           )
         ))
       })
 
-      # Handle Uploaded File and Process Immediately
-      observeEvent(input$submit_file, {
-        rv$uploaded_file <- input$uploaded_file
+      # Handle Sync Upload (for Syncing Images)
+      observeEvent(input$submit_sync_file, {
+        rv$uploaded_file <- input$uploaded_sync_file
 
         if (is.null(rv$uploaded_file)) {
           showModal(modalDialog(
             title = "Error",
-            "No file was uploaded. Please try again.",
+            "No PPTX file was uploaded for syncing. Please try again.",
             footer = NULL
           ))
           return()
@@ -103,13 +96,13 @@ pptx_server <- function(id) {
 
         # Show processing modal
         showModal(modalDialog(
-          title = "Processing File",
-          "Your file is being processed. This may take a few moments.",
+          title = "Processing Sync",
+          "Your PPTX file is being synced. This may take a few moments.",
           footer = NULL
         ))
 
         tryCatch({
-          # Call the utility function to replace images
+          # Call the utility function to replace images in the PPTX
           sync_images(pptx_in, pptx_out)
 
           # Save the processed file path for download
@@ -144,34 +137,65 @@ pptx_server <- function(id) {
         })
       })
 
-      # Configurations Options UI
+      # Configurations Options UI for the Template Upload
       output$configs_options <- renderUI({
         tagList(
-          selectInput(ns("template"), "Choose Template:", selected = rv$template,
-                      choices = c("Blank Template" = "default", "A2-Ai Template" = "a2_ai")),
-          numericInput(ns("height"), "Height (inches):", value = rv$height, min = 0),
-          numericInput(ns("width"), "Width (inches):", value = rv$width, min = 0),
+          fileInput(ns("uploaded_template"), "Choose a PPTX Template for Adding Images:", accept = ".pptx"),  # Upload field for template
           footer = tagList(
-            actionButton(ns("confirm"), "Apply")
+            actionButton(ns("submit_template"), "Submit Template"),
+            modalButton("Cancel")
           )
         )
       })
 
-      output$figure_options_table <- renderTable({
-        data.frame(
-          Format = c("Default", "HTML Slides", "HTML Slides (reveal.js)", "PDF", "PDF Slides (Beamer)",
-                     "PowerPoint", "MS Word, ODT, RTF", "EPUB"),
-          Default = c("7 x 5", "9.5 x 6.5", "9 x 5", "5.5 x 3.5", "10 x 7",
-                      "7.5 x 5.5", "5 x 4", "5 x 4")
-        )
-      }, striped = TRUE, hover = TRUE, bordered = TRUE)
+      # Handle Template Upload for Add Images
+      observeEvent(input$submit_template, {
+        rv$uploaded_template <- input$uploaded_template
 
-      # Confirm Configurations
-      observeEvent(input$confirm, {
-        rv$template <- input$template
-        rv$height <- input$height
-        rv$width <- input$width
+        if (is.null(rv$uploaded_template)) {
+          showModal(modalDialog(
+            title = "Error",
+            "No template file was uploaded. A blank template will be used instead.",
+            footer = NULL
+          ))
+          return()
+        }
+
+        # Update the template with the uploaded template for add_images functionality
+        rv$template <- rv$uploaded_template$datapath
         removeModal()
+      })
+
+      # Clear Template Button functionality
+      observeEvent(input$clear_template, {
+        showModal(modalDialog(
+          title = "Clear Template",
+          "Are you sure you want to clear the current template and use a blank template?",
+          footer = tagList(
+            actionButton(ns("confirm_clear"), "Yes, Clear Template"),
+            modalButton("Cancel")
+          )
+        ))
+      })
+
+      # Confirm the action to clear the template
+      observeEvent(input$confirm_clear, {
+        # If an uploaded template exists, remove it
+        if (!is.null(rv$uploaded_template) && file.exists(rv$uploaded_template$datapath)) {
+          file.remove(rv$uploaded_template$datapath)
+        }
+
+        # Reset the template variables
+        rv$uploaded_template <- NULL
+        rv$template <- "default"  # Set to the blank template
+
+        removeModal()
+
+        showModal(modalDialog(
+          title = "Template Cleared",
+          "The uploaded template has been removed, and a blank template will be used instead.",
+          footer = modalButton("Close")
+        ))
       })
 
       observe({
@@ -203,13 +227,14 @@ pptx_server <- function(id) {
           showModal(modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
           start_time <- Sys.time()
 
+          # Use the uploaded template, or the default if not uploaded
+          base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath else rv$template
+
           suppressWarnings(create_pptx_with_images(
             remote_url = remote_url,
             files = selected_items(),
             output_pptx = temp_pptx,
-            base_pptx = rv$template,
-            height = rv$height,
-            width = rv$width
+            base_pptx = base_pptx
           ))
 
           file.copy(temp_pptx, file)
@@ -238,7 +263,6 @@ pptx_server <- function(id) {
     }
   )
 }
-
 
 app_ui <- function() {
   pptx_ui(id = "app")
