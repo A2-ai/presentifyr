@@ -230,7 +230,7 @@ pptx_server <- function(id) {
           # Use the uploaded template, or the default if not uploaded
           base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath else rv$template
 
-          suppressWarnings(create_pptx_with_images(
+          suppressWarnings(create_pptx(
             remote_url = remote_url,
             files = selected_items(),
             output_pptx = temp_pptx,
