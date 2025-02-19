@@ -6,7 +6,7 @@ from pptx import Presentation
 from pptx.shapes.shapetree import PicturePlaceholder, PlaceholderPicture
 from py_logger import get_logger
 
-def sync_images(pptx_in, output_pptx, image_dict):
+def sync_images(input_pptx, output_pptx, image_dict):
     ## This needs a better solution
     if PlaceholderPicture:
         PlaceholderPicture.insert_picture = PicturePlaceholder.insert_picture
@@ -16,7 +16,7 @@ def sync_images(pptx_in, output_pptx, image_dict):
 
     logger = get_logger()
     logger.debug(f"Starting image sync process.")
-    presentation = Presentation(pptx_in)
+    presentation = Presentation(input_pptx)
 
     start_pattern = r'\{prfy\}\:'
     end_pattern = r'\.[^.]+$'
@@ -25,10 +25,10 @@ def sync_images(pptx_in, output_pptx, image_dict):
     logger.info("Scanning slides for image replacements...")
 
     for slide_index, slide in enumerate(presentation.slides, start=1):  
-        match_found = False  # Track if at least one image was replaced
+        match_found = False 
 
         for shape in slide.shapes:
-            if shape.shape_type == 14:  # Shape type 14 = Picture
+            if shape.shape_type == 14:
                 alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
                 logger.debug(f"Slide {slide_index}: Checking image alt-text: {alt_text}")
 
