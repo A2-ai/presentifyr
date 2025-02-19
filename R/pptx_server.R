@@ -240,6 +240,7 @@ pptx_server <- function(id) {
   )
 }
 
+#' @noRd
 app_server <- function(input, output, session) {
   pptx_server(id="app")
 }
