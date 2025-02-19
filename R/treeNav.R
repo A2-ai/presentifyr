@@ -1,76 +1,68 @@
-#' @import shiny
-NULL
-
-# repurposed some functions and js from https://github.com/stla/jsTreeR
-# changes: allows more filtering of lists, excluded dir selections of only excluded
-# files give modals w/ excluded file list, renames rootFolder to basename,
-# redid id/naming so ns can be passed in
-
-#' Generate Excluded File Message
-#'
-#' This function generates an HTML formatted message indicating which files are excluded
-#' from selection as QC items in a directory.
+#' Generates an HTML formatted message indicating which files are excluded from selection.
 #'
 #' @param excluded_files A character vector of file paths that are excluded from selection.
 #'
-#' @return A character string containing an HTML formatted message listing the excluded files,
-#' or an empty string if no files are excluded.
-#' @examples
+#' @return A character string containing an HTML formatted message listing the excluded files or an empty string if no files are excluded.
+#' @keywords internal
+#' @noRd
+#'
+#' @examples \dontrun{
 #' excluded_files <- c("path/to/file1.txt", "path/to/file2.pdf")
 #' generate_excluded_file_message(excluded_files)
-#' @noRd
+#' }
 generate_excluded_file_message <- function(excluded_files) {
   error_icon_html <- "<span style='font-size: 24px; vertical-align: middle;'>&#10071;</span>"
   messages <- c()
+
   if (length(excluded_files) > 0) {
     messages <- sprintf(
       "%s The selected directory contains only the following files which are not selectable items:<ul>%s</ul><br>",
       error_icon_html, paste0("<li>", basename(excluded_files), "</li>", collapse = "")
     )
   }
+
   return(messages)
 }
 
-#' Generate Exclude Patterns
-#'
-#' This function generates patterns to exclude binary files and specific directories,
-#' such as the `renv` directory, from a file listing.
+#' Generates patterns to exclude binary files and specific directories, such as the `renv` directory, from a file listing.
 #'
 #' @return A character string containing the exclusion patterns.
-#' @importFrom pkglite ext_binary
+#' @keywords internal
 #' @noRd
 exclude_patterns <- function() {
-  # excludes binaries as won't be qc items
-  exclude_pattern <- paste0("\\.(", paste(ext_binary(flat = TRUE), collapse = "|"), ")$", collapse = "")
+  exclude_pattern <- paste0("\\.(", paste(pkglite::ext_binary(flat = TRUE), collapse = "|"), ")$", collapse = "")
 
-  # removes renv folder and specifically
-  # makes sure to only scope exactly for "renv/" only so renv2/ 2renv/ renv.R gets picked up
   exclude_pattern <- c(exclude_pattern, "\\brenv\\b")
+
   exclude_pattern <- paste(exclude_pattern, collapse = "|")
+
   return(exclude_pattern)
 }
 
-#' @importFrom pkglite ext_binary
+#' Generates a regular expression pattern to include files.
+#'
+#' @return A regular expression pattern.
+#' @keywords internal
+#' @noRd
 include_imgs <- function() {
-  pattern <- paste0("\\.(", paste(ext_binary(flat = FALSE)$figure, collapse = "|"), ")$")
+  pattern <- paste0("\\.(", paste(pkglite::ext_binary(flat = FALSE)$figure, collapse = "|"), ")$")
 
   return(pattern)
 }
 
-#' List Files and Directories
+#' Lists files and directories in a specified path, filtering out those that match a given pattern. It ensures that only non-empty directories are included in the list.
 #'
-#' This function lists files and directories in a specified path,
-#' filtering out those that match a given pattern. It ensures that
-#' only non-empty directories are included in the list.
+#' @param path A character string specifying the file path to list files and directories from.
+#' @param pattern A character string containing the pattern to filter out files and directories. Default is NULL.
+#' @param all.files A logical value indicating whether to list all files, including hidden files. Default is FALSE.
 #'
-#' @param path A character string specifying the path to list files and directories from.
-#' @param pattern A character string containing the pattern to filter out files and directories.
-#' @param all.files A logical value indicating whether to list all files, including hidden files.
-#'
-#' @return A list containing two elements:
-#' @importFrom fs dir_ls dir_exists is_file is_dir
+#' @return A list containing two
+#' @keywords internal
 #' @noRd
-list_files_and_dirs <- function(path, type = c("include", "exclude", "none"), pattern = NULL, all.files) {
+list_files_and_dirs <- function(path,
+                                type = c("include", "exclude", "none"),
+                                pattern = NULL,
+                                all.files = FALSE) {
   type <- match.arg(type)
 
   # changed so pattern is only filtered out after retrieving all non filtered out values
@@ -110,28 +102,38 @@ list_files_and_dirs <- function(path, type = c("include", "exclude", "none"), pa
   return(list(files = files_and_dirs, empty = FALSE))
 }
 
+#' @noRd
+treeNavigatorUI <- function(id,
+                            width = "100%",
+                            height = "auto") {
+  tree <- jsTreeR::jstreeOutput(outputId = id, width = width, height = height)
 
-#' @importFrom jsTreeR jstreeOutput
-treeNavigatorUI <- function(id, width = "100%", height = "auto") {
-  tree <- jstreeOutput(outputId = id, width = width, height = height)
-  tagList(
+  htmltools::tagList(
     tree,
-    tags$link(rel = "stylesheet", type = "text/css", href = "presentifyr/tree.css"),
-    tags$script(type = "module", src = "presentifyr/tree.js")
+    htmltools::tags$link(rel = "stylesheet", type = "text/css", href = "presentifyr/tree.css"),
+    htmltools::tags$script(type = "module", src = "presentifyr/tree.js")
   )
 }
 
-#' @importFrom jsTreeR renderJstree jstree
-treeNavigatorServer <- function(
-    id, rootFolder, search = TRUE, wholerow = FALSE, contextMenu = FALSE,
-    theme = "proton", type = "none", pattern = NULL, all.files = FALSE, ...) {
+#' @noRd
+treeNavigatorServer <- function(id,
+                                rootFolder,
+                                search = TRUE,
+                                wholerow = FALSE,
+                                contextMenu = FALSE,
+                                theme = "proton",
+                                type = "none",
+                                pattern = NULL,
+                                all.files = FALSE,
+                                ...) {
   theme <- match.arg(theme, c("default", "proton"))
-  moduleServer(id, function(input, output, session) {
 
-    output[["treeNavigator"]] <- renderJstree({
-      req(...)
+  shiny::moduleServer(id, function(input, output, session) {
 
-      suppressMessages(jstree(
+    output[["treeNavigator"]] <- jsTreeR::renderJstree({
+      shiny::req(...)
+
+      suppressMessages(jsTreeR::jstree(
         nodes = list(
           list(
             text = basename(rootFolder),
@@ -165,7 +167,7 @@ treeNavigatorServer <- function(
     dirname <- dirname(rootFolder)
 
     # example: given input "testTree/inst/www", full_path will be "/path/to/proj/testTree/inst/www"
-    observeEvent(input[["path_from_js"]], {
+    shiny::observeEvent(input[["path_from_js"]], {
       input <- input[["path_from_js"]]
 
       # null is sent back to reset the input if user wants to reselect unviable dirs
@@ -181,9 +183,9 @@ treeNavigatorServer <- function(
       if (lf$empty) {
         message_content <- generate_excluded_file_message(lf$files)
         session$sendCustomMessage("noChildrenFound", lf$empty)
-        showModal(modalDialog(
+        shiny::showModal(shiny::modalDialog(
           easyClose = TRUE,
-          HTML(message_content)
+          htmltools::HTML(message_content)
         ))
         return()
       }
@@ -198,8 +200,8 @@ treeNavigatorServer <- function(
     })
 
     # example: given input "testTree/inst/www", Paths is "inst/www"
-    Paths <- reactiveVal()
-    observeEvent(input[["treeNavigator_selected_paths"]], {
+    Paths <- shiny::reactiveVal()
+    shiny::observeEvent(input[["treeNavigator_selected_paths"]], {
       selected <- input[["treeNavigator_selected_paths"]]
 
       adjusted_paths <- sapply(selected, function(item) {

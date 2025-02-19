@@ -1,17 +1,17 @@
 #' Syncs images from file to a given PowerPoint presentation (.pptx) file.
 #'
-#' @param pptx_in The file path to the input .pptx file.
+#' @param input_pptx The file path to the input .pptx file.
 #' @param output_pptx The file path where the modified .pptx file will be saved.
 #'
-#' @export
+#' @keywords internal
 #'
 #' @examples \dontrun{
 #' sync_images(
-#'   pptx_in = pptx_in,
+#'   input_pptx = input_pptx,
 #'   output_pptx = output_pptx
 #' )
 #' }
-sync_images <- function(pptx_in,
+sync_images <- function(input_pptx,
                         output_pptx) {
 
   image_files <- parse_directory_for_images(
@@ -23,12 +23,12 @@ sync_images <- function(pptx_in,
     stop("No images found in the specified directory.")
   }
 
-  image_dict <- as.list(setNames(image_files, basename(image_files)))
+  image_dict <- as.list(stats::setNames(image_files, basename(image_files)))
   temp_image_dict <- tempfile(fileext = ".json")
   jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
 
   script <- system.file("scripts/sync_images.py", package = "presentifyr")
-  args <- c("run", script, "-i", pptx_in, "-o", output_pptx, "-d", temp_image_dict)
+  args <- c("run", script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict)
 
   if (is.null(getOption("venv_dir"))) {
     message("Setting options('venv_dir') to project root.")
@@ -45,7 +45,10 @@ sync_images <- function(pptx_in,
 
   result <- tryCatch({
     processx::run(
-      command = uv_path, args = args, env = c("current", VIRTUAL_ENV = venv_path), error_on_status = TRUE,
+      command = uv_path,
+      args = args,
+      env = c("current", VIRTUAL_ENV = venv_path),
+      error_on_status = TRUE,
       echo = TRUE,
     )
   }, error = function(e) {

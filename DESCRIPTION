@@ -13,18 +13,18 @@ Depends:
     R (>= 2.10)
 Imports: 
     bslib (>= 0.7.0),
+    cli,
+    jsonlite,
     fs (>= 1.6.4),
     gert (>= 2.1.0),
     here (>= 1.0.1),
+    htmltools,
     jsTreeR (>= 2.6.0),
-    officer (>= 0.6.6),
     pkglite (>= 0.2.2),
     processx (>= 3.8.4),
-    purrr (>= 1.0.2),
     shiny (>= 1.8.1.1),
-    withr (>= 3.0.0)
+    stats
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 LazyData: true
-VignetteBuilder: knitr

@@ -1,11 +1,11 @@
 #' Adds images from file to a given PowerPoint presentation (.pptx) file.
 #'
 #' @param files A list of image file paths to be inserted into the .pptx file.
-#' @param repo_url The URL of the repository where an image is stored.
+#' @param repo_url The url of the repository where an image is stored.
 #' @param base_pptx The file path to an existing .pptx file that serves as a template. Default is NULL. If NULL, a blank presentation is used.
 #' @param output_pptx The file path where the modified .pptx file will be saved.
 #'
-#' @export
+#' @keywords internal
 #'
 #' @examples \dontrun{
 #' add_images(
