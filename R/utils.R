@@ -1,7 +1,8 @@
-#' Conditionally cleans an SSH URL to HTTPS
+#' Conditionally cleans an SSH url to HTTPS
 #'
-#' @return HTTPS URL
+#' @param remote_url The url of the repository where an image is stored.
 #'
+#' @return A character string representing the https url
 #' @keywords internal
 #' @noRd
 clean_url <- function(remote_url) {
@@ -25,20 +26,20 @@ clean_url <- function(remote_url) {
 
 #' Gets the current git branch
 #'
-#' @return current git branch
-#'
+#' @return A character string of the current git branch
 #' @keywords internal
 #' @noRd
 get_current_branch <- function() {
   branch_info <- processx::run("git", args = c("symbolic-ref", "--short", "HEAD"))
+
   current_branch <- trimws(branch_info$stdout)  ## Trim any whitespace or newlines
+
   return(current_branch)
 }
 
 #' Gets the path to uv -- pre v0.5.0 installed to /.cargo/bin post v0.5.0 to /.local/bin
 #'
-#' @return path to uv
-#'
+#' @return A character string representing the file path to uv
 #' @keywords internal
 #' @noRd
 get_uv_path <- function() {
@@ -56,8 +57,12 @@ get_uv_path <- function() {
 
 #' Creates a vector of available image file paths
 #'
-#' @return vector of image file paths
+#' @param directory The path to the directory where image files will be searched.
+#' @param recursive A logical value. If TRUE, searches for images recursively in subdirectories. Default is TRUE.
+#' @param full.names A logical value. If TRUE, returns full file paths; if FALSE, returns only file names. Default is TRUE.
+#' @param exclude_dirs A vector of directory names to exclude from the search. Default is NULL. If NULL, no directories are excluded.
 #'
+#' @return A character vector of image file paths.
 #' @keywords internal
 #' @noRd
 parse_directory_for_images <- function(directory,
