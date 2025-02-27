@@ -19,6 +19,7 @@ add_images <- function(files,
                        repo_url,
                        base_pptx = NULL,
                        output_pptx) {
+  log4r::debug(.le$logger, "Starting add_images R function")
 
   base_pptx_path <- if (!is.null(base_pptx)) {
     base_pptx
@@ -47,7 +48,7 @@ add_images <- function(files,
     processx::run(
       command = uv_path,
       args = args,
-      env = c("current", VIRTUAL_ENV = venv_path),
+      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
       error_on_status = TRUE,
       echo = TRUE,
     )

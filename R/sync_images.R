@@ -13,6 +13,7 @@
 #' }
 sync_images <- function(input_pptx,
                         output_pptx) {
+  log4r::debug(.le$logger, "Starting sync_images R function")
 
   image_files <- parse_directory_for_images(
     directory = here::here(),
@@ -20,18 +21,21 @@ sync_images <- function(input_pptx,
   )
 
   if (length(image_files) == 0) {
-    stop("No images found in the specified directory.")
+    stop("No images found in the specified directory")
   }
+
+  log4r::info(.le$logger, paste0("Found ", length(image_files), " image files"))
 
   image_dict <- as.list(stats::setNames(image_files, basename(image_files)))
   temp_image_dict <- tempfile(fileext = ".json")
   jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
+  log4r::info(.le$logger, paste("Temporary image dictionary created at:", temp_image_dict))
 
   script <- system.file("scripts/sync_images.py", package = "presentifyr")
   args <- c("run", script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict)
 
   if (is.null(getOption("venv_dir"))) {
-    message("Setting options('venv_dir') to project root.")
+    message("Setting options('venv_dir') to project root")
     options("venv_dir" = here::here())
   }
 
@@ -47,7 +51,7 @@ sync_images <- function(input_pptx,
     processx::run(
       command = uv_path,
       args = args,
-      env = c("current", VIRTUAL_ENV = venv_path),
+      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
       error_on_status = TRUE,
       echo = TRUE,
     )

@@ -1,5 +1,6 @@
 .onLoad <- function(...) {
   shiny::addResourcePath("presentifyr", system.file(".", package = "presentifyr"))
+  toggle_logger()
 }
 
 .onAttach <- function(...){
