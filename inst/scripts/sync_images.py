@@ -15,7 +15,7 @@ def sync_images(input_pptx, output_pptx, image_dict):
         PlaceholderPicture._replace_placeholder_with = PicturePlaceholder._replace_placeholder_with
 
     logger = get_logger()
-    logger.debug(f"Starting image sync process.")
+    logger.debug(f"Starting sync_images py function.")
     presentation = Presentation(input_pptx)
 
     start_pattern = r'\{prfy\}\:'

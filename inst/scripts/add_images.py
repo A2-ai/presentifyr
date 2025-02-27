@@ -5,7 +5,7 @@ from py_logger import get_logger
 
 def add_images_to_ppt(files, repo_url, output_pptx, base_pptx=None):
     logger = get_logger()
-    logger.debug(f"Starting image insertion process. Total images: {len(files)}.")
+    logger.debug(f"Starting add_images py function. Total images: {len(files)}.")
   
     if base_pptx is not None and os.path.exists(base_pptx):
         logger.info(f"Using base PowerPoint template: {base_pptx}")
