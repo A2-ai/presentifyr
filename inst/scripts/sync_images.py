@@ -3,28 +3,34 @@ import re
 import argparse
 import json
 from pptx import Presentation
-from pptx.util import Inches
 from pptx.shapes.shapetree import PicturePlaceholder, PlaceholderPicture
+from py_logger import get_logger
 
-def sync_images(pptx_in, pptx_out, image_dict):
+def sync_images(input_pptx, output_pptx, image_dict):
+    ## This needs a better solution
     if PlaceholderPicture:
         PlaceholderPicture.insert_picture = PicturePlaceholder.insert_picture
         PlaceholderPicture._new_placeholder_pic = PicturePlaceholder._new_placeholder_pic
         PlaceholderPicture._get_or_add_image = PicturePlaceholder._get_or_add_image
         PlaceholderPicture._replace_placeholder_with = PicturePlaceholder._replace_placeholder_with
 
-    presentation = Presentation(pptx_in)
+    logger = get_logger()
+    logger.debug(f"Starting sync_images py function.")
+    presentation = Presentation(input_pptx)
 
-    # Regex to match something like '{prfy}:my_image.png'
     start_pattern = r'\{prfy\}\:'
     end_pattern = r'\.[^.]+$'
     magic_pattern = re.compile(start_pattern + '.*?' + end_pattern)
 
-    for slide in presentation.slides:
+    logger.info("Scanning slides for image replacements...")
+
+    for slide_index, slide in enumerate(presentation.slides, start=1):  
+        match_found = False 
+
         for shape in slide.shapes:
             if shape.shape_type == 14:
                 alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
-                print(f"Checking image alt-text: {alt_text}")
+                logger.debug(f"Slide {slide_index}: Checking image alt-text: {alt_text}")
 
                 match = magic_pattern.match(alt_text)
                 if match:
@@ -32,19 +38,21 @@ def sync_images(pptx_in, pptx_out, image_dict):
                     image_path = image_dict.get(figure_name)
 
                     if image_path and os.path.exists(image_path):
-                        print(f"Attempting shape.insert_picture({image_path})...")
+                        logger.info(f"Slide {slide_index}: Replacing image {figure_name} with {image_path}")
 
                         new_pic = shape.insert_picture(image_path)
                         new_pic._element.nvPicPr.cNvPr.set("descr", alt_text)
 
-                        print(f"Inserted new picture from {image_path}")
+                        logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path}")
+                        match_found = True
                     else:
-                        print(f"No image or file not found: {image_path}")
-                else:
-                    print("No matching alt-text for replacement.")
+                        logger.warning(f"Slide {slide_index}: No matching image found for {figure_name} or file does not exist.")
 
-    presentation.save(pptx_out)
-    print(f"Presentation saved at '{pptx_out}'.")
+        if not match_found:
+            logger.warning(f"Slide {slide_index}: No matching alt-text for replacement.")
+
+    presentation.save(output_pptx)
+    logger.debug(f"PowerPoint saved as {output_pptx}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Sync images within input pptx file by monkey-patching placeholders.")

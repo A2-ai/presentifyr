@@ -1,71 +1,61 @@
 import os
 import argparse
 from pptx import Presentation
+from py_logger import get_logger
 
-def log_message(message, log_file="script.log"):
-    with open(log_file, "a") as log:
-        log.write(f"{message}\n")
-
-def add_images_to_ppt(files, repo_url, output_pptx, base_pptx=None, log_file="script.log"):
+def add_images_to_ppt(files, repo_url, output_pptx, base_pptx=None):
+    logger = get_logger()
+    logger.debug(f"Starting add_images py function. Total images: {len(files)}.")
+  
     if base_pptx is not None and os.path.exists(base_pptx):
-        # If base_pptx is provided and valid
-        log_message(f"Using base PowerPoint template: {base_pptx}", log_file)
-        my_pres = Presentation(base_pptx)  # Load user-uploaded template
+        logger.info(f"Using base PowerPoint template: {base_pptx}")
+        my_pres = Presentation(base_pptx) 
     else:
-        # If no base_pptx is provided or it's invalid, create a blank PowerPoint presentation
-        log_message("No PowerPoint template provided or invalid template. Creating a blank PowerPoint presentation.", log_file)
-        my_pres = Presentation()  # Create a blank PowerPoint
+        logger.info("No valid PowerPoint template. Creating a blank presentation.")
+        my_pres = Presentation()
 
-    # Always scan for slide layout with placeholder type 18
     slide_layout_index = None
     for idx, layout in enumerate(my_pres.slide_layouts):
         for shape in layout.shapes:
             if shape.is_placeholder and shape.placeholder_format.type == 18:
-                slide_layout_index = idx  # Set the layout index where the placeholder type 18 is found
-                log_message(f"Found layout {slide_layout_index} with placeholder type 18.", log_file)
+                slide_layout_index = idx  ## Set the layout index where the placeholder type 18 is found
+                logger.debug(f"Found layout {slide_layout_index} with placeholder type 18.")
                 break
         if slide_layout_index is not None:
             break
 
-    # If no suitable layout is found, raise an error instead of defaulting
+    ## If no suitable layout is found, raise an error instead of defaulting
     if slide_layout_index is None:
-        log_message("No slide layout with placeholder type 18 found.", log_file)
+        logger.error("No slide layout with placeholder type 18 found.")
         raise ValueError("No slide layout with the correct placeholder type (18) found in the PowerPoint template or blank presentation.")
-
-    total_files = len(files)
-    log_message(f"Total files to process: {total_files}", log_file)
 
     for i, file in enumerate(files, start=1):
         file_url = f"{repo_url}/{file}"
         sentinel_val = "{prfy}:"
         alt_text = f"{sentinel_val}{os.path.basename(file)}"
 
-        log_message(f"Creating slide {i} of {total_files}...", log_file)
+        logger.info(f"Creating slide {i}/{len(files)} with image: {file}.")
 
-        # Add a new slide with the appropriate layout (determined dynamically)
         slide = my_pres.slides.add_slide(my_pres.slide_layouts[slide_layout_index])
         
         for shape in slide.shapes:
             if shape.is_placeholder:
-                log_message(f"Shape Name: {shape.name}, Type: {shape.placeholder_format.type}, ID: {shape.placeholder_format.idx}", log_file)
+                logger.debug(f"Shape: {shape.name}, Type: {shape.placeholder_format.type}, ID: {shape.placeholder_format.idx}.")
             else:
-                log_message(f"Shape Name: {shape.name}, Not a Placeholder, Type: {shape.shape_type}", log_file)
+                logger.debug(f"Shape: {shape.name}, Type: {shape.shape_type}")
 
         placeholder = None
         for shape in slide.placeholders:
             if shape.is_placeholder and shape.placeholder_format.type == 18:
                 placeholder = shape
-                log_message(f"Found placeholder for slide {i}: {shape.name} (Type: {shape.placeholder_format.type})", log_file)
+                logger.debug(f"Found placeholder for slide {i}: {shape.name} (Type: {shape.placeholder_format.type}).")
                 break
 
         if placeholder:
-            log_message(f"Before image insertion: Placeholder XML: {placeholder._element}", log_file)
-            
-            # Insert the image into the placeholder
-            placeholder.insert_picture(file)
-            log_message(f"Image inserted into placeholder for slide {i}.", log_file)
+            placeholder.insert_picture(file) ## Insert the image into the placeholder
+            logger.info(f"Image inserted into placeholder for slide {i}.")
 
-            # Locate the new <p:pic> element created after image insertion
+            ## Locate the new <p:pic> element created after image insertion
             try:
                 namespaces = {
                     'p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
@@ -73,26 +63,24 @@ def add_images_to_ppt(files, repo_url, output_pptx, base_pptx=None, log_file="sc
                 }
                 pic_element = slide._element.findall('.//p:pic', namespaces)[-1]
 
-                # Find the <p:cNvPr> element and set the alt text
+                ## Find the <p:cNvPr> element and set the alt text
                 nv_cNvPr = pic_element.find('.//p:nvPicPr/p:cNvPr', namespaces)
                 if nv_cNvPr is not None:
                     nv_cNvPr.set("descr", alt_text)
-                    log_message(f"Alt text set for slide {i}: {alt_text}", log_file)
+                    logger.debug(f"Alt text set for slide {i}: {alt_text}.")
                 else:
-                    log_message(f"Failed to find <p:cNvPr> in <p:pic> for slide {i}.", log_file)
+                    logger.warning(f"Failed to find <p:cNvPr> in <p:pic> for slide {i}.")
             except Exception as e:
-                log_message(f"Error locating or updating <p:pic> for slide {i}: {e}", log_file)
+                logger.error(f"Error locating or updating <p:pic> for slide {i}: {e}.")
 
-            # Add notes
             notes_slide = slide.notes_slide
             notes_text_frame = notes_slide.notes_text_frame
             notes_text_frame.text = file_url
         else:
-            log_message(f"No content placeholder found on slide {i}. Skipping image placement.", log_file)
+            logger.warning(f"No content placeholder found on slide {i}. Skipping image placement.")
 
-    log_message("Saving PowerPoint file...", log_file)
     my_pres.save(output_pptx)
-    log_message(f"PowerPoint saved as {output_pptx}", log_file)
+    logger.debug(f"PowerPoint saved as {output_pptx}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add images within input pptx file")

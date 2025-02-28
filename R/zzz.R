@@ -1,7 +1,6 @@
-#' @importFrom shiny addResourcePath
-#' @noRd
 .onLoad <- function(...) {
   shiny::addResourcePath("presentifyr", system.file(".", package = "presentifyr"))
+  toggle_logger()
 }
 
 .onAttach <- function(...){
@@ -15,7 +14,7 @@
 
 #' Generates a tidyverse-esque onAttach message
 #'
-#' @return a message to display on attach
+#' @return A message to display on attach
 #' @keywords internal
 #' @noRd
 #'
@@ -27,14 +26,14 @@ presentifyr_options_message <- function() {
   unset_options <- c()
   optional_options <- c()
 
-  # Check for each used options
+  ## Check for each used options
   root <- getOption("venv_dir")
   if (is.null(root)) {
     unset_options <- c(unset_options, "options('venv_dir') is not set. venv will be created in Project root")
   } else {
     set_options <- c(set_options, paste("venv_dir:", root))
   }
-  # NICE TO HAVES
+  ## Nice to haves
   uvversion <- getOption("uv.version")
   if (is.null(uvversion)) {
     optional_options <- c(optional_options, "options('uv.version') is not set. Default is 0.5.1")
@@ -56,7 +55,7 @@ presentifyr_options_message <- function() {
     set_options <- c(set_options, paste("python-pptx.version:", pptx_vers))
   }
 
-  # format .onAttach message
+  ## Format .onAttach message
   msg <- ""
   if (length(set_options)) {
     msg <- paste0(

@@ -70,23 +70,20 @@ initialize_python <- function() {
   }
 }
 
-
 #' Grabs python version for .venv
 #'
-#' @param venv_dir Path to .venv directory
+#' @param venv_dir The file path to the .venv directory
 #'
-#' @return string of python version or NULL
+#' @return A string of python version or NULL
 #' @keywords internal
+#' @noRd
 get_py_version <- function(venv_dir) {
-  # Read the file into R
   file_path <- file.path(venv_dir, ".venv", "pyvenv.cfg")
 
   file_content <- readLines(file_path)
 
-  # Search for the line containing "version_info = "
   version_info_line <- grep("version_info = ", file_content, value = TRUE)
 
-  # Extract everything after "version_info = "
   if (length(version_info_line) > 0) {
     version_info <- sub(".*version_info =\\s*", "", version_info_line)
     return(version_info)
