@@ -212,7 +212,16 @@ pptx_server <- function(id) {
         content = function(file) {
           temp_pptx <- tempfile(fileext = ".pptx")
 
-          remote_url <- gert::git_remote_info()$url
+          remote_url <- gert::git_remote_info()$url # tryCatch in observe as primary
+
+          if (is.null(remote_url)) {
+            shiny::showModal(shiny::modalDialog(
+              title = "Error",
+              "No remote repositories found. Please set a remote repository before using this feature.",
+              footer = NULL
+            ))
+            return()
+          } # Backup for secondary
 
           shiny::showModal(shiny::modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
           log4r::info(.le$logger, "Starting PowerPoint creation process")
@@ -221,38 +230,39 @@ pptx_server <- function(id) {
           # Use the uploaded template, or the default if not uploaded
           base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath else rv$template
 
-          suppressWarnings(create_pptx(
-            remote_url = remote_url,
-            files = selected_items(),
-            output_pptx = temp_pptx,
-            base_pptx = base_pptx
-          ))
+          tryCatch({
+            create_pptx(
+              remote_url = remote_url,
+              files = selected_items(),
+              output_pptx = temp_pptx,
+              base_pptx = base_pptx
+            )
 
-          file.copy(temp_pptx, file)
-          elapsed_time <- Sys.time() - start_time
+            file.copy(temp_pptx, file)
+            elapsed_time <- Sys.time() - start_time
 
-          log4r::info(.le$logger, sprintf("PowerPoint successfully created and downloaded in %.2f seconds.", elapsed_time))
-          on.exit({
-            file.remove(temp_pptx)
+            log4r::info(.le$logger, sprintf("PowerPoint successfully created and downloaded in %.2f seconds.", elapsed_time))
+
             shiny::showModal(shiny::modalDialog(
+              title = "Success",
               sprintf("PowerPoint downloaded successfully in %.2f seconds.", elapsed_time),
+              footer = shiny::modalButton("Close")
             ))
+
+          }, error = function(e) {
+            log4r::error(.le$logger, paste0("Error creating PPTX: ", e$message))
+            shiny::showModal(shiny::modalDialog(
+              title = "Error",
+              paste("An error occurred while creating the PowerPoint:", e$message),
+              footer = NULL
+            ))
+          }, finally = {
+            on.exit({
+              if (file.exists(temp_pptx)) file.remove(temp_pptx)
+            })
           })
         }
       )
-
-      output$show_files <- shiny::renderUI({
-        htmltools::tagList(
-          htmltools::tags$h6("These files reflect the current state of your local repository.
-                  Please commit and push any changes or new files to GitHub to
-                  ensure the links are up to date."),
-          htmltools::tags$ul(
-            lapply(selected_items(), function(file) {
-              htmltools::tags$li(file)
-            })
-          )
-        )
-      })
       log4r::debug(.le$logger, "pptx_server module loaded successfully")
     }
   )

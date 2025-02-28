@@ -95,7 +95,7 @@ list_files_and_dirs <- function(path,
   # didn't reuse included_files because wanted only files rather than both files and dirs + recurse
   if (length(included_files) == 0) {
     list_all <- fs::dir_ls(path = path, all = TRUE, regexp = NULL, recurse = T, ignore.case = TRUE, type = "file")
-    debug(.le$logger, glue::glue("All files (when included_files is empty): {paste(list_all, collapse = ', ')}"))
+    log4r::debug(.le$logger, glue::glue("All files (when included_files is empty): {paste(list_all, collapse = ', ')}"))
     return(list(files = list_all, empty = TRUE))
   }
 
