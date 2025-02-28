@@ -24,12 +24,12 @@ sync_images <- function(input_pptx,
     stop("No images found in the specified directory")
   }
 
-  log4r::info(.le$logger, paste0("Found ", length(image_files), " image files"))
+  log4r::debug(.le$logger, paste0("Found ", length(image_files), " image files"))
 
   image_dict <- as.list(stats::setNames(image_files, basename(image_files)))
   temp_image_dict <- tempfile(fileext = ".json")
   jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
-  log4r::info(.le$logger, paste("Temporary image dictionary created at:", temp_image_dict))
+  log4r::debug(.le$logger, paste("Temporary image dictionary created at:", temp_image_dict))
 
   script <- system.file("scripts/sync_images.py", package = "presentifyr")
   args <- c("run", script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict)

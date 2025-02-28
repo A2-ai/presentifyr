@@ -80,7 +80,7 @@ def add_images_to_ppt(files, repo_url, output_pptx, base_pptx=None):
             logger.warning(f"No content placeholder found on slide {i}. Skipping image placement.")
 
     my_pres.save(output_pptx)
-    logger.info(f"PowerPoint saved as {output_pptx}")
+    logger.debug(f"PowerPoint saved as {output_pptx}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add images within input pptx file")

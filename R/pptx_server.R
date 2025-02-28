@@ -12,6 +12,7 @@ pptx_server <- function(id) {
   shiny::moduleServer(
     id,
     function(input, output, session) {
+      log4r::debug(.le$logger, "pptx_server module started")
       ns <- shiny::NS(id)
       rv <- shiny::reactiveValues(
         template = "default",  # Default template for the add_images functionality
@@ -22,6 +23,7 @@ pptx_server <- function(id) {
 
       # Configurations Modal for uploading a template
       shiny::observeEvent(input$configs, {
+        log4r::info(.le$logger, "Opening Configuration Modal")
         shiny::showModal(shiny::modalDialog(
           title = "Customize PPTX Configuration",
           shiny::uiOutput(ns("configs_options")),
@@ -33,6 +35,7 @@ pptx_server <- function(id) {
 
       # Sync Modal for syncing images
       shiny::observeEvent(input$sync, {
+        log4r::info(.le$logger, "Opening Sync Modal")
         shiny::showModal(shiny::modalDialog(
           title = "Sync Images",
           htmltools::tags$p("Use this menu to sync your PPTX with a local repository."),
@@ -42,7 +45,7 @@ pptx_server <- function(id) {
 
       # Upload Modal for Config (Template Upload)
       shiny::observeEvent(input$open_upload_sync, {
-        # Close the sync modal and open the upload modal for syncing
+        log4r::info(.le$logger, "Opening Upload Modal for Sync Modal")
         shiny::removeModal()
         shiny::showModal(shiny::modalDialog(
           title = "Upload PPTX for Syncing",
@@ -56,9 +59,11 @@ pptx_server <- function(id) {
 
       # Handle Sync Upload (for Syncing Images)
       shiny::observeEvent(input$submit_sync_file, {
+        log4r::info(.le$logger, "Processing submitted PPTX for syncing")
         rv$uploaded_file <- input$uploaded_sync_file
 
         if (is.null(rv$uploaded_file)) {
+          log4r::error(.le$logger, "No PPTX file uploaded for syncing")
           shiny::showModal(shiny::modalDialog(
             title = "Error",
             "No PPTX file was uploaded for syncing. Please try again.",
@@ -77,11 +82,11 @@ pptx_server <- function(id) {
           footer = NULL
         ))
 
+        log4r::debug(.le$logger, paste0("Input PPTX file: ", input_pptx))
+
         tryCatch({
-          # Call the utility function to replace images in the PPTX
           sync_images(input_pptx, output_pptx)
 
-          # Save the processed file path for download
           rv$processed_file <- output_pptx
 
           # Success modal
@@ -101,9 +106,11 @@ pptx_server <- function(id) {
             },
             content = function(file) {
               file.copy(rv$processed_file, file)
+              log4r::info(.le$logger, "Downloading synced PPTX file")
             }
           )
         }, error = function(e) {
+          log4r::error(.le$logger, paste0("Error processing PPTX file: ", e$message))
           # Error modal
           shiny::showModal(shiny::modalDialog(
             title = "Error",
@@ -115,6 +122,7 @@ pptx_server <- function(id) {
 
       # Configurations Options UI for the Template Upload
       output$configs_options <- shiny::renderUI({
+        log4r::info(.le$logger, "Rendering UI for PPTX template upload options")
         htmltools::tagList(
           shiny::fileInput(ns("uploaded_template"), "Choose a PPTX Template for Adding Images:", accept = ".pptx"),  # Upload field for template
           footer = htmltools::tagList(
@@ -129,6 +137,7 @@ pptx_server <- function(id) {
         rv$uploaded_template <- input$uploaded_template
 
         if (is.null(rv$uploaded_template)) {
+          log4r::error(.le$logger, "No template PPTX file was uploaded")
           shiny::showModal(shiny::modalDialog(
             title = "Error",
             "No template file was uploaded. A blank template will be used instead.",
@@ -138,12 +147,15 @@ pptx_server <- function(id) {
         }
 
         # Update the template with the uploaded template for add_images functionality
+        log4r::debug(.le$logger, paste0("Template uploaded: ", rv$uploaded_template$datapath))
+        log4r::info(.le$logger, "Template uploaded successfully")
         rv$template <- rv$uploaded_template$datapath
         shiny::removeModal()
       })
 
       # Clear Template Button functionality
       shiny::observeEvent(input$clear_template, {
+        log4r::info(.le$logger, "Clearing template")
         shiny::showModal(shiny::modalDialog(
           title = "Clear Template",
           "Are you sure you want to clear the current template and use a blank template?",
@@ -159,6 +171,7 @@ pptx_server <- function(id) {
         # If an uploaded template exists, remove it
         if (!is.null(rv$uploaded_template) && file.exists(rv$uploaded_template$datapath)) {
           file.remove(rv$uploaded_template$datapath)
+          log4r::info(.le$logger, "Template file removed")
         }
 
         # Reset the template variables
@@ -167,6 +180,7 @@ pptx_server <- function(id) {
 
         shiny::removeModal()
 
+        log4r::info(.le$logger, "Template reset to default")
         shiny::showModal(shiny::modalDialog(
           title = "Template Cleared",
           "The uploaded template has been removed, and a blank template will be used instead.",
@@ -201,6 +215,7 @@ pptx_server <- function(id) {
           remote_url <- gert::git_remote_info()$url
 
           shiny::showModal(shiny::modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
+          log4r::info(.le$logger, "Starting PowerPoint creation process")
           start_time <- Sys.time()
 
           # Use the uploaded template, or the default if not uploaded
@@ -215,6 +230,8 @@ pptx_server <- function(id) {
 
           file.copy(temp_pptx, file)
           elapsed_time <- Sys.time() - start_time
+
+          log4r::info(.le$logger, sprintf("PowerPoint successfully created and downloaded in %.2f seconds.", elapsed_time))
           on.exit({
             file.remove(temp_pptx)
             shiny::showModal(shiny::modalDialog(
@@ -236,11 +253,13 @@ pptx_server <- function(id) {
           )
         )
       })
+      log4r::debug(.le$logger, "pptx_server module loaded successfully")
     }
   )
 }
 
 #' @noRd
 app_server <- function(input, output, session) {
+  log4r::info(.le$logger, "Initializing app server.")
   pptx_server(id="app")
 }

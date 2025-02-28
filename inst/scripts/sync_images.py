@@ -52,7 +52,7 @@ def sync_images(input_pptx, output_pptx, image_dict):
             logger.warning(f"Slide {slide_index}: No matching alt-text for replacement.")
 
     presentation.save(output_pptx)
-    logger.info(f"PowerPoint saved as {output_pptx}")
+    logger.debug(f"PowerPoint saved as {output_pptx}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Sync images within input pptx file by monkey-patching placeholders.")
