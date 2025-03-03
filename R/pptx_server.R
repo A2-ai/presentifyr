@@ -15,7 +15,6 @@ pptx_server <- function(id) {
       log4r::debug(.le$logger, "pptx_server module started")
       ns <- shiny::NS(id)
       rv <- shiny::reactiveValues(
-        template = "default",  # Default template for the add_images functionality
         uploaded_template = NULL,  # To store the uploaded template for add_images
         uploaded_file = NULL,  # For the sync functionality
         processed_file = NULL
@@ -149,7 +148,6 @@ pptx_server <- function(id) {
         # Update the template with the uploaded template for add_images functionality
         log4r::debug(.le$logger, paste0("Template uploaded: ", rv$uploaded_template$datapath))
         log4r::info(.le$logger, "Template uploaded successfully")
-        rv$template <- rv$uploaded_template$datapath
         shiny::removeModal()
       })
 
@@ -176,7 +174,6 @@ pptx_server <- function(id) {
 
         # Reset the template variables
         rv$uploaded_template <- NULL
-        rv$template <- "default"  # Set to the blank template
 
         shiny::removeModal()
 
@@ -228,7 +225,7 @@ pptx_server <- function(id) {
           start_time <- Sys.time()
 
           # Use the uploaded template, or the default if not uploaded
-          base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath else rv$template
+          base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath
 
           tryCatch({
             create_pptx(
