@@ -66,7 +66,7 @@ pptx_server <- function(id) {
           shiny::showModal(shiny::modalDialog(
             title = "Error",
             "No PPTX file was uploaded for syncing. Please try again.",
-            footer = NULL
+            footer = shiny::modalButton("Close")
           ))
           return()
         }
@@ -114,7 +114,7 @@ pptx_server <- function(id) {
           shiny::showModal(shiny::modalDialog(
             title = "Error",
             paste("An error occurred while processing your file:", e$message),
-            footer = NULL
+            footer = shiny::modalButton("Close")
           ))
         })
       })
@@ -140,7 +140,7 @@ pptx_server <- function(id) {
           shiny::showModal(shiny::modalDialog(
             title = "Error",
             "No template file was uploaded. A blank template will be used instead.",
-            footer = NULL
+            footer = shiny::modalButton("Close")
           ))
           return()
         }
@@ -251,7 +251,7 @@ pptx_server <- function(id) {
             shiny::showModal(shiny::modalDialog(
               title = "Error",
               paste("An error occurred while creating the PowerPoint:", e$message),
-              footer = NULL
+              footer = shiny::modalButton("Close")
             ))
           }, finally = {
             on.exit({
