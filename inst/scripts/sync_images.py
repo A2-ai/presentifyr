@@ -42,11 +42,24 @@ def sync_images(input_pptx, output_pptx, image_dict):
                     top = shape.top
                     width = shape.width
                     height = shape.height
+                    
+                    # Extract cropping values
+                    crop_top = shape.crop_top
+                    crop_bottom = shape.crop_bottom
+                    crop_left = shape.crop_left
+                    crop_right = shape.crop_right
+                    
                     slide.shapes._spTree.remove(shape._element)  # Remove the existing picture
                     new_pic = slide.shapes.add_picture(image_path, left, top, width, height)
                     new_pic._element.nvPicPr.cNvPr.set("descr", alt_text)
                     
-                    logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path} with original dimensions maintained")
+                    # Apply cropping to the new image
+                    new_pic.crop_top = crop_top
+                    new_pic.crop_bottom = crop_bottom
+                    new_pic.crop_left = crop_left
+                    new_pic.crop_right = crop_right
+                    
+                    logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path} with original dimensions and cropping maintained")
                     match_found = True
                 else:
                     logger.warning(f"Slide {slide_index}: No matching image found for {figure_name} or file does not exist.")
