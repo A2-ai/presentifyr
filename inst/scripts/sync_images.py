@@ -7,13 +7,6 @@ from pptx.shapes.shapetree import PicturePlaceholder, PlaceholderPicture
 from py_logger import get_logger
 
 def sync_images(input_pptx, output_pptx, image_dict):
-    ## This needs a better solution
-    if PlaceholderPicture:
-        PlaceholderPicture.insert_picture = PicturePlaceholder.insert_picture
-        PlaceholderPicture._new_placeholder_pic = PicturePlaceholder._new_placeholder_pic
-        PlaceholderPicture._get_or_add_image = PicturePlaceholder._get_or_add_image
-        PlaceholderPicture._replace_placeholder_with = PicturePlaceholder._replace_placeholder_with
-
     logger = get_logger()
     logger.debug(f"Starting sync_images py function.")
     presentation = Presentation(input_pptx)
@@ -28,25 +21,35 @@ def sync_images(input_pptx, output_pptx, image_dict):
         match_found = False 
 
         for shape in slide.shapes:
-            if shape.shape_type == 14:
+            if shape.shape_type == 14:  # Placeholder image
                 alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
-                logger.debug(f"Slide {slide_index}: Checking image alt-text: {alt_text}")
+            elif shape.shape_type == 13:  # Standard picture shape
+                alt_text = shape._element.nvPicPr.cNvPr.attrib.get("descr", "")
+            else:
+                continue  # Skip non-picture shapes
+            
+            logger.debug(f"Slide {slide_index}: Checking image alt-text: {alt_text}")
 
-                match = magic_pattern.match(alt_text)
-                if match:
-                    figure_name = match.group(0).split(':')[1]
-                    image_path = image_dict.get(figure_name)
-
-                    if image_path and os.path.exists(image_path):
-                        logger.info(f"Slide {slide_index}: Replacing image {figure_name} with {image_path}")
-
-                        new_pic = shape.insert_picture(image_path)
-                        new_pic._element.nvPicPr.cNvPr.set("descr", alt_text)
-
-                        logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path}")
-                        match_found = True
-                    else:
-                        logger.warning(f"Slide {slide_index}: No matching image found for {figure_name} or file does not exist.")
+            match = magic_pattern.match(alt_text)
+            if match:
+                figure_name = match.group(0).split(':')[1]
+                image_path = image_dict.get(figure_name)
+                
+                if image_path and os.path.exists(image_path):
+                    logger.info(f"Slide {slide_index}: Replacing image {figure_name} with {image_path}")
+                    
+                    left = shape.left
+                    top = shape.top
+                    width = shape.width
+                    height = shape.height
+                    slide.shapes._spTree.remove(shape._element)  # Remove the existing picture
+                    new_pic = slide.shapes.add_picture(image_path, left, top, width, height)
+                    new_pic._element.nvPicPr.cNvPr.set("descr", alt_text)
+                    
+                    logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path} with original dimensions maintained")
+                    match_found = True
+                else:
+                    logger.warning(f"Slide {slide_index}: No matching image found for {figure_name} or file does not exist.")
 
         if not match_found:
             logger.warning(f"Slide {slide_index}: No matching alt-text for replacement.")
