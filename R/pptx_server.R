@@ -260,6 +260,18 @@ pptx_server <- function(id) {
           })
         }
       )
+      output$show_files <- shiny::renderUI({
+        htmltools::tagList(
+          htmltools::tags$h6("These files reflect the current state of your local repository.
+                  Please commit and push any changes or new files to GitHub to
+                  ensure the links are up to date."),
+          htmltools::tags$ul(
+            lapply(selected_items(), function(file) {
+              htmltools::tags$li(file)
+            })
+          )
+        )
+      })
       log4r::debug(.le$logger, "pptx_server module loaded successfully")
     }
   )
