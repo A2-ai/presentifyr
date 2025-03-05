@@ -1,5 +1,7 @@
 .onLoad <- function(...) {
+  message("presentifyr package is loading...")
   shiny::addResourcePath("presentifyr", system.file(".", package = "presentifyr"))
+  options(shiny.maxRequestSize = 5000*1024^2)
   toggle_logger()
 }
 

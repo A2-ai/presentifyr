@@ -19,6 +19,7 @@ def sync_images(input_pptx, output_pptx, image_dict):
 
     for slide_index, slide in enumerate(presentation.slides, start=1):  
         match_found = False 
+        replacements = []  # Store shapes to replace later
 
         for shape in slide.shapes:
             if shape.shape_type == 14:  # Placeholder image
@@ -36,33 +37,36 @@ def sync_images(input_pptx, output_pptx, image_dict):
                 image_path = image_dict.get(figure_name)
                 
                 if image_path and os.path.exists(image_path):
-                    logger.info(f"Slide {slide_index}: Replacing image {figure_name} with {image_path}")
-                    
-                    left = shape.left
-                    top = shape.top
-                    width = shape.width
-                    height = shape.height
-                    
-                    # Extract cropping values
-                    crop_top = shape.crop_top
-                    crop_bottom = shape.crop_bottom
-                    crop_left = shape.crop_left
-                    crop_right = shape.crop_right
-                    
-                    slide.shapes._spTree.remove(shape._element)  # Remove the existing picture
-                    new_pic = slide.shapes.add_picture(image_path, left, top, width, height)
-                    new_pic._element.nvPicPr.cNvPr.set("descr", alt_text)
-                    
-                    # Apply cropping to the new image
-                    new_pic.crop_top = crop_top
-                    new_pic.crop_bottom = crop_bottom
-                    new_pic.crop_left = crop_left
-                    new_pic.crop_right = crop_right
-                    
-                    logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path} with original dimensions and cropping maintained")
+                    logger.info(f"Slide {slide_index}: Queuing replacement for {figure_name} with {image_path}")
+                    replacements.append((shape, image_path, alt_text))
                     match_found = True
                 else:
                     logger.warning(f"Slide {slide_index}: No matching image found for {figure_name} or file does not exist.")
+
+        # Process replacements after iteration to avoid modifying slide.shapes while iterating
+        for shape, image_path, alt_text in replacements:
+            left = shape.left
+            top = shape.top
+            width = shape.width
+            height = shape.height
+            
+            # Extract cropping values
+            crop_top = shape.crop_top
+            crop_bottom = shape.crop_bottom
+            crop_left = shape.crop_left
+            crop_right = shape.crop_right
+            
+            slide.shapes._spTree.remove(shape._element)  # Remove the existing picture
+            new_pic = slide.shapes.add_picture(image_path, left, top, width, height)
+            new_pic._element.nvPicPr.cNvPr.set("descr", alt_text)
+            
+            # Apply cropping to the new image
+            new_pic.crop_top = crop_top
+            new_pic.crop_bottom = crop_bottom
+            new_pic.crop_left = crop_left
+            new_pic.crop_right = crop_right
+            
+            logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path} with original dimensions and cropping maintained")
 
         if not match_found:
             logger.warning(f"Slide {slide_index}: No matching alt-text for replacement.")
