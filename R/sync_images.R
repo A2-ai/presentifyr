@@ -20,10 +20,6 @@ sync_images <- function(input_pptx,
     exclude_dirs = c("/renv/") ## Exclude unnecessary directories
   )
 
-  if (length(image_files) == 0) {
-    stop("No images found in the specified directory")
-  }
-
   log4r::debug(.le$logger, paste0("Found ", length(image_files), " image files"))
 
   image_dict <- as.list(stats::setNames(image_files, basename(image_files)))

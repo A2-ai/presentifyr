@@ -21,15 +21,13 @@ add_images <- function(files,
                        output_pptx) {
   log4r::debug(.le$logger, "Starting add_images R function")
 
-  base_pptx_path <- if (!is.null(base_pptx)) {
-    base_pptx
-  } else {
-    "None"  ## Use a blank presentation if no template is uploaded
-  }
-
   script <- system.file("scripts/add_images.py", package = "presentifyr")
 
-  args <- c("run", script, "-f", files, "-r", repo_url, "-o", output_pptx, "-b", base_pptx_path)
+  args <- c("run", script, "-f", files, "-r", repo_url, "-o", output_pptx)
+
+  if (!is.null(base_pptx)) {
+    args <- c(args, "-b", base_pptx)  # Only add if not NULL
+  }
 
   if (is.null(getOption("venv_dir"))) {
     message("Setting options('venv_dir') to project root.")

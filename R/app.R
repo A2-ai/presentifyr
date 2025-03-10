@@ -1,5 +1,3 @@
-options(shiny.maxRequestSize = 1000*1024^2)
-
 #' This function launches the Shiny application.
 #'
 #' @export
