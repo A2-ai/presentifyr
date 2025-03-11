@@ -1,7 +1,7 @@
 #' Extracts layouts as images from a given PowerPoint presentation (.pptx) file.
 #'
 #' @param base_pptx The file path to an existing .pptx file that serves as a template.
-#' @param output_pptx The file path where the modified .pptx file will be saved. Default is tempdir().
+#' @param output_dir The file path where the layout .pngs will be saved.
 #'
 #' @keywords internal
 #'
@@ -9,7 +9,7 @@
 #' extract_layouts(base_pptx = base_pptx)
 #' }
 extract_layouts <- function(base_pptx,
-                            output_dir = tempdir()) {
+                            output_dir) {
   log4r::debug(.le$logger, "Starting extract layouts R function")
 
   script <- system.file("scripts/extract_layouts.py", package = "presentifyr")
