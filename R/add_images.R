@@ -67,4 +67,5 @@ add_images <- function(files,
     log4r::info(.le$logger, paste0("Add images Python script failed. Stdout: ", e$stdout))
     stop(paste("Add images Python script failed. Status: ", e$status, "Stderr: ", e$stderr))
   })
+  log4r::debug(.le$logger, "Exiting add images R function")
 }

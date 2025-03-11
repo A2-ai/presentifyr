@@ -13,7 +13,12 @@
 #' }
 sync_images <- function(input_pptx,
                         output_pptx) {
-  log4r::debug(.le$logger, "Starting sync_images R function")
+  log4r::debug(.le$logger, "Starting sync images R function")
+
+  if (!file.exists(input_pptx)) {
+    log4r::error(.le$logger, paste("The input .pptx file does not exist:", input_pptx))
+    stop(paste("The input .pptx file does not exist:", input_pptx))
+  }
 
   image_files <- parse_directory_for_images(
     directory = here::here(),
@@ -31,17 +36,22 @@ sync_images <- function(input_pptx,
   args <- c("run", script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict)
 
   if (is.null(getOption("venv_dir"))) {
+    log4r::info(.le$logger, "Setting options('venv_dir') to project root.")
     message("Setting options('venv_dir') to project root")
+
     options("venv_dir" = here::here())
   }
 
   venv_path <- file.path(getOption("venv_dir"), ".venv")
 
   if (!dir.exists(venv_path)) {
+    log4r::error(.le$logger, "Virtual environment not found. Please initialize with initialize_python.")
     stop("Create virtual environment with initialize_python")
   }
+  log4r::debug(.le$logger, paste("venv_path resolved to: ", venv_path))
 
   uv_path <- get_uv_path()
+  log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
 
   result <- tryCatch({
     processx::run(
@@ -52,6 +62,10 @@ sync_images <- function(input_pptx,
       echo = TRUE,
     )
   }, error = function(e) {
+    log4r::error(.le$logger, paste0("Sync images Python script failed. Status: ", e$status))
+    log4r::error(.le$logger, paste0("Sync images Python script failed. Stderr: ", e$stderr))
+    log4r::info(.le$logger, paste0("Sync images Python script failed. Stdout: ", e$stdout))
     stop(paste("Sync images script failed. Status: ", e$status, "Stderr: ", e$stderr))
   })
+  log4r::debug(.le$logger, "Exiting sync images R function")
 }

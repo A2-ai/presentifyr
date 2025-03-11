@@ -8,7 +8,7 @@ def add_images_to_ppt(files, repo_url, output_pptx, slide_layout_index, base_ppt
     logger.debug(f"Starting add images Python function.")
   
     if base_pptx and os.path.exists(base_pptx):
-        logger.info(f"Using base PowerPoint template: {base_pptx}")
+        logger.debug(f"Using base PowerPoint template: {base_pptx}")
         my_pres = Presentation(base_pptx) 
     else:
         logger.info("No valid PowerPoint template. Creating a blank presentation.")
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     parser.add_argument('-r', '--repo_url', type=str, required=True, help="Repo URL")
     parser.add_argument('-o', '--output_pptx', type=str, required=True, help="Output pptx file path")
     parser.add_argument('-b', '--base_pptx', type=str, default=None, help="Base PowerPoint template")
-    parser.add_argument('-l', '--slide_layout_index', type=int, help="Slide layout index to use")
+    parser.add_argument('-l', '--slide_layout_index', type=int, required=True, help="Slide layout index to use")
 
     args = parser.parse_args()
 
