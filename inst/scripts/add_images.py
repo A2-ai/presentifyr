@@ -3,7 +3,7 @@ import argparse
 from pptx import Presentation
 from py_logger import get_logger
 
-def add_images_to_ppt(files, repo_url, output_pptx, base_pptx=None):
+def add_images_to_ppt(files, repo_url, output_pptx, slide_layout_index=0, base_pptx=None):
     logger = get_logger()
     logger.debug(f"Starting add_images py function. Total images: {len(files)}.")
   
@@ -13,21 +13,6 @@ def add_images_to_ppt(files, repo_url, output_pptx, base_pptx=None):
     else:
         logger.info("No valid PowerPoint template. Creating a blank presentation.")
         my_pres = Presentation()
-
-    slide_layout_index = None
-    for idx, layout in enumerate(my_pres.slide_layouts):
-        for shape in layout.shapes:
-            if shape.is_placeholder and shape.placeholder_format.type == 18:
-                slide_layout_index = idx  ## Set the layout index where the placeholder type 18 is found
-                logger.debug(f"Found layout {slide_layout_index} with placeholder type 18.")
-                break
-        if slide_layout_index is not None:
-            break
-
-    ## If no suitable layout is found, raise an error instead of defaulting
-    if slide_layout_index is None:
-        logger.error("No slide layout with placeholder type 18 found.")
-        raise ValueError("No slide layout with the correct placeholder type (18) found in the PowerPoint template or blank presentation.")
 
     for i, file in enumerate(files, start=1):
         file_url = f"{repo_url}/{file}"
@@ -88,7 +73,8 @@ if __name__ == "__main__":
     parser.add_argument('-r', '--repo_url', type=str, required=True, help="Repo URL")
     parser.add_argument('-o', '--output', type=str, required=True, help="Output pptx file path")
     parser.add_argument('-b', '--base_pptx', type=str, default=None, help="Base PowerPoint template (optional)")
+    parser.add_argument('-l', '--slide_layout_index', type=int, help="Which layout index from the base PPTX to use.")
 
     args = parser.parse_args()
 
-    add_images_to_ppt(args.files, args.repo_url, args.output, base_pptx=args.base_pptx)
+    add_images_to_ppt(args.files, args.repo_url, args.output, base_pptx=args.base_pptx, slide_layout_index=args.slide_layout_index)

@@ -18,12 +18,14 @@
 add_images <- function(files,
                        repo_url,
                        base_pptx = NULL,
+                       slide_layout_index,
                        output_pptx) {
   log4r::debug(.le$logger, "Starting add_images R function")
+  log4r::debug(.le$logger, "Layout index being used: ", slide_layout_index)
 
   script <- system.file("scripts/add_images.py", package = "presentifyr")
 
-  args <- c("run", script, "-f", files, "-r", repo_url, "-o", output_pptx)
+  args <- c("run", script, "-f", files, "-r", repo_url, "-l", slide_layout_index, "-o", output_pptx)
 
   if (!is.null(base_pptx)) {
     args <- c(args, "-b", base_pptx)  # Only add if not NULL

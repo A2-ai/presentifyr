@@ -18,6 +18,7 @@
 create_pptx <- function(files,
                         remote_url = gert::git_remote_info()$url,
                         base_pptx,
+                        slide_layout_index,
                         output_pptx) {
 
   repo_url <- clean_url(remote_url) ## Convert SSH URL to HTTPS URL if needed
@@ -26,5 +27,5 @@ create_pptx <- function(files,
 
   repo_url <- paste0(repo_url, "/blob/", current_branch)
 
-  add_images(files, repo_url, base_pptx, output_pptx)
+  add_images(files, repo_url, base_pptx, slide_layout_index, output_pptx)
 }
