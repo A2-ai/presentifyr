@@ -29,7 +29,7 @@ pptx_server <- function(id) {
       )
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      # 1) Show the "Configs" modal for uploading a PPTX template
+      # 1) "Configs" modal for uploading a PPTX template
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$configs, {
         log4r::info(.le$logger, "Opening Configuration Modal")
@@ -196,8 +196,6 @@ pptx_server <- function(id) {
 
           rv$extracted_layouts <- layouts_df
 
-          log4r::info(.le$logger, paste0("Extracted ", nrow(layouts_df), " layouts from template"))
-
           # Now show a new modal to let user pick a layout
           showLayoutSelectionModal()
 
@@ -240,7 +238,7 @@ pptx_server <- function(id) {
               htmltools::tags$div(
                 style = "display: inline-block; margin: 10px; text-align: center;",
                 htmltools::tags$img(src = rv$extracted_layouts$image_path[i], width = "150px"),
-                htmltools::tags$p(paste("Index:", rv$extracted_layouts$index[i]))
+                htmltools::tags$p(paste("Layout:", rv$extracted_layouts$index[i]))
               )
             })
           ),
@@ -332,14 +330,11 @@ pptx_server <- function(id) {
 
           remote_url <- gert::git_remote_info()$url
 
-          if (is.null(remote_url)) {
-            shiny::showModal(shiny::modalDialog(
-              title = "Error",
-              "No remote repositories found. Please set a remote repository before using this feature.",
-              footer = NULL
-            ))
-            return()
-          }
+          repo_url <- clean_url(remote_url) ## Convert SSH URL to HTTPS URL if needed
+
+          current_branch <- get_current_branch()
+
+          repo_url <- paste0(repo_url, "/blob/", current_branch)
 
           shiny::showModal(shiny::modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
           log4r::info(.le$logger, "Starting PowerPoint creation process")
@@ -352,13 +347,12 @@ pptx_server <- function(id) {
           chosen_layout_idx <- rv$selected_layout_idx
 
           tryCatch({
-            # Suppose 'create_pptx()' accepts a 'layout_index' argument
-            create_pptx(
-              remote_url     = remote_url,
+            add_images(
               files          = selected_items(),
+              repo_url      = repo_url,
               output_pptx    = temp_pptx,
-              base_pptx      = base_pptx,
-              slide_layout_index   = chosen_layout_idx  # <- use the stored index
+              slide_layout_index   = chosen_layout_idx,  # <- use the stored index
+              base_pptx      = base_pptx
             )
 
             file.copy(temp_pptx, file)
