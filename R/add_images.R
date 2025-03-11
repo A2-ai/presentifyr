@@ -18,31 +18,40 @@
 add_images <- function(files,
                        repo_url,
                        base_pptx = NULL,
-                       slide_layout_index,
+                       slide_layout_index = NULL,
                        output_pptx) {
-  log4r::debug(.le$logger, "Starting add_images R function")
-  log4r::debug(.le$logger, "Layout index being used: ", slide_layout_index)
+  log4r::debug(.le$logger, "Starting add images R function")
 
   script <- system.file("scripts/add_images.py", package = "presentifyr")
+
+  if (is.null(slide_layout_index)) {
+    slide_layout_index <- 8 ## Hard coded for blank presentations
+    log4r::info(.le$logger, paste("Slide_layout_index is NULL, setting value to: ", slide_layout_index))
+  }
 
   args <- c("run", script, "-f", files, "-r", repo_url, "-l", slide_layout_index, "-o", output_pptx)
 
   if (!is.null(base_pptx)) {
-    args <- c(args, "-b", base_pptx)  # Only add if not NULL
+    args <- c(args, "-b", base_pptx)
   }
 
   if (is.null(getOption("venv_dir"))) {
+    log4r::info(.le$logger, "Setting options('venv_dir') to project root.")
     message("Setting options('venv_dir') to project root.")
+
     options("venv_dir" = here::here())
   }
 
   venv_path <- file.path(getOption("venv_dir"), ".venv")
 
   if (!dir.exists(venv_path)) {
+    log4r::error(.le$logger, "Virtual environment not found. Please initialize with initialize_python.")
     stop("Create virtual environment with initialize_python")
   }
+  log4r::debug(.le$logger, paste("venv_path resolved to: ", venv_path))
 
   uv_path <- get_uv_path()
+  log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
 
   result <- tryCatch({
     processx::run(
@@ -53,6 +62,9 @@ add_images <- function(files,
       echo = TRUE,
     )
   }, error = function(e) {
-    stop(paste("Add images script failed. Status: ", e$status, "Stderr: ", e$stderr))
+    log4r::error(.le$logger, paste0("Add images Python script failed. Status: ", e$status))
+    log4r::error(.le$logger, paste0("Add images Python script failed. Stderr: ", e$stderr))
+    log4r::info(.le$logger, paste0("Add images Python script failed. Stdout: ", e$stdout))
+    stop(paste("Add images Python script failed. Status: ", e$status, "Stderr: ", e$stderr))
   })
 }
