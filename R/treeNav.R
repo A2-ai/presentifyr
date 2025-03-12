@@ -24,21 +24,6 @@ generate_excluded_file_message <- function(excluded_files) {
   return(messages)
 }
 
-#' Generates patterns to exclude binary files and specific directories, such as the `renv` directory, from a file listing.
-#'
-#' @return A character string containing the exclusion patterns.
-#' @keywords internal
-#' @noRd
-exclude_patterns <- function() {
-  exclude_pattern <- paste0("\\.(", paste(pkglite::ext_binary(flat = TRUE), collapse = "|"), ")$", collapse = "")
-
-  exclude_pattern <- c(exclude_pattern, "\\brenv\\b")
-
-  exclude_pattern <- paste(exclude_pattern, collapse = "|")
-
-  return(exclude_pattern)
-}
-
 #' Generates a regular expression pattern to include files.
 #'
 #' @return A regular expression pattern.

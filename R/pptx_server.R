@@ -160,7 +160,7 @@ pptx_server <- function(id) {
         for (layout_idx in rv$extracted_layouts$index) {
           local({
             li <- layout_idx
-            observeEvent(input[[paste0("btn_layout_", li)]], {
+            shiny::observeEvent(input[[paste0("btn_layout_", li)]], {
               rv$selected_layout_idx <- li
               log4r::info(.le$logger, paste0("User selected layout index: ", li))
             })
@@ -199,7 +199,7 @@ pptx_server <- function(id) {
           log4r::debug(.le$logger, paste("Removed old layout PNGs:", paste(old_layout_files, collapse = ", ")))
         }
 
-        removeResourcePath("pptx_layouts")
+        shiny::removeResourcePath("pptx_layouts")
 
         rv$uploaded_template <- NULL
         rv$extracted_layouts <- NULL
@@ -412,7 +412,7 @@ pptx_server <- function(id) {
           log4r::info(.le$logger, paste("Session ended, removed layout PNGs:", paste(old_layout_files, collapse = ", ")))
         }
 
-        removeResourcePath("pptx_layouts")
+        shiny::removeResourcePath("pptx_layouts")
         log4r::info(.le$logger, "Session ended -> resource path 'pptx_layouts' removed.")
       })
     }
