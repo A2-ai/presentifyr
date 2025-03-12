@@ -17,7 +17,6 @@ Imports:
     jsonlite,
     fs (>= 1.6.4),
     gert (>= 2.1.0),
-    glue,
     here (>= 1.0.1),
     htmltools,
     jsTreeR (>= 2.6.0),
