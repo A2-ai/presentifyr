@@ -163,11 +163,6 @@ pptx_server <- function(id) {
             observeEvent(input[[paste0("btn_layout_", li)]], {
               rv$selected_layout_idx <- li
               log4r::info(.le$logger, paste0("User selected layout index: ", li))
-
-              shiny::showNotification(
-                paste("Selected Layout:", li),
-                type = "message"
-              )
             })
           })
         }
