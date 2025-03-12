@@ -215,7 +215,7 @@ treeNavigatorServer <- function(id,
     Paths <- shiny::reactiveVal()
     shiny::observeEvent(input[["treeNavigator_selected_paths"]], {
       selected <- input[["treeNavigator_selected_paths"]]
-      log4r::debug(.le$logger, glue::glue("Selected paths: {paste(selected, collapse = ', ')}"))
+      log4r::debug(.le$logger, glue::glue("Selected file paths: {paste(selected, collapse = ', ')}"))
 
       adjusted_paths <- sapply(selected, function(item) {
         fs::path_rel(item[["path"]], start = basename(rootFolder))
