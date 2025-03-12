@@ -396,8 +396,22 @@ pptx_server <- function(id) {
           )
         )
       })
-
       log4r::debug(.le$logger, "pptx_server module loaded successfully")
+
+      session$onSessionEnded(function() {
+        old_layout_files <- list.files(
+          tempdir(),
+          pattern = "^layout_\\d+\\.png$",
+          full.names = TRUE
+        )
+        if (length(old_layout_files) > 0) {
+          unlink(old_layout_files, force = TRUE)
+          log4r::info(.le$logger, paste("Session ended, removed layout PNGs:", paste(old_layout_files, collapse = ", ")))
+        }
+
+        removeResourcePath("pptx_layouts")
+        log4r::info(.le$logger, "Session ended -> resource path 'pptx_layouts' removed.")
+      })
     }
   )
 }
