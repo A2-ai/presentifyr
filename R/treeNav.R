@@ -41,7 +41,7 @@ include_imgs <- function() {
 #' @param pattern A character string containing the pattern to filter out files and directories. Default is NULL.
 #' @param all.files A logical value indicating whether to list all files, including hidden files. Default is FALSE.
 #'
-#' @return A list containing two
+#' @return A list containing files or directories as file paths.
 #' @keywords internal
 #' @noRd
 list_files_and_dirs <- function(path,
