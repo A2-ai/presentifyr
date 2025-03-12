@@ -398,6 +398,9 @@ pptx_server <- function(id) {
       })
       log4r::debug(.le$logger, "pptx_server module loaded successfully")
 
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      # 8. Session close + clear layouts
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       session$onSessionEnded(function() {
         old_layout_files <- list.files(
           tempdir(),
