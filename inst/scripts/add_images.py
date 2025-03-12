@@ -30,7 +30,6 @@ def add_images_to_ppt(files, repo_url, output_pptx, slide_layout_index, base_ppt
         for shape in slide.placeholders:
             if shape.is_placeholder and shape.placeholder_format.type == 18:
                 placeholder = shape
-                logger.debug(f"Found placeholder for slide {i}: {shape.name} (Type: {shape.placeholder_format.type}).")
                 break
 
         if placeholder:

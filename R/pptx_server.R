@@ -24,7 +24,7 @@ pptx_server <- function(id) {
       )
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      # 1) Show "Configs" modal for uploading & configuring PPTX
+      # 1. Create configs modal for uploading & configuring PPTX
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$configs, {
         log4r::info(.le$logger, "Opening Configuration Modal")
@@ -45,12 +45,11 @@ pptx_server <- function(id) {
       }
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      # 2) The UI for file input, template confirmation, layout selection
+      # 2. UI for file input, template confirmation, layout selection
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$configs_options <- shiny::renderUI({
         log4r::info(.le$logger, "Rendering UI for PPTX configuration & layout selection")
 
-        # File input + "Submit Template" button
         file_upload_area <- shiny::tagList(
           shiny::fileInput(
             ns("uploaded_template"),
@@ -60,17 +59,15 @@ pptx_server <- function(id) {
           shiny::actionButton(ns("submit_template"), "Submit Template")
         )
 
-        # Show a label for currently used PPTX, if any
         template_label <- NULL
         if (!is.null(rv$uploaded_template)) {
           template_name <- basename(rv$uploaded_template$name)
           template_label <- htmltools::tags$p(
-            style = "font-weight:bold; color:blue; margin-top:5px;",
+            style = "font-weight:bold; color:blue; margin-top:5px;", ## Blue confirmation text
             paste("Currently using template:", template_name)
           )
         }
 
-        # Show layout selection if we have extracted layouts
         layout_area <- NULL
         if (!is.null(rv$extracted_layouts) && nrow(rv$extracted_layouts) > 0) {
           layout_area <- htmltools::tagList(
@@ -79,11 +76,10 @@ pptx_server <- function(id) {
           )
         }
 
-        # A label for the selected layout, if any
         layout_label <- NULL
         if (!is.null(rv$selected_layout_idx)) {
           layout_label <- htmltools::tags$p(
-            style = "font-weight:bold; color:green; margin-top:5px;",
+            style = "font-weight:bold; color:green; margin-top:5px;", ## Green confirmation text
             paste("Selected Layout:", rv$selected_layout_idx)
           )
         }
@@ -96,7 +92,6 @@ pptx_server <- function(id) {
         )
       })
 
-      # Build the layout thumbnails + select buttons
       buildLayoutSelectionUI <- function() {
         layout_divs <- lapply(seq_len(nrow(rv$extracted_layouts)), function(i) {
           layout_idx <- rv$extracted_layouts$index[i]
@@ -116,7 +111,7 @@ pptx_server <- function(id) {
       }
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      # 3) On "Submit Template", extract layouts
+      # 3. Submit template - extract layouts
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$submit_template, {
         rv$uploaded_template <- input$uploaded_template
@@ -132,14 +127,14 @@ pptx_server <- function(id) {
         }
 
         base_pptx <- rv$uploaded_template$datapath
-        output_dir <- tempdir()
-
         log4r::debug(.le$logger, paste0("Template uploaded: ", base_pptx))
+
+        output_dir <- tempdir()
+        log4r::debug(.le$logger, paste0("Temporary output directory: ", output_dir))
 
         tryCatch({
           layouts_df <- extract_layouts(base_pptx, output_dir)
 
-          # Make images accessible
           shiny::addResourcePath("pptx_layouts", output_dir)
           layouts_df$image_path <- file.path("pptx_layouts", basename(layouts_df$image_path))
 
@@ -157,7 +152,7 @@ pptx_server <- function(id) {
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      # 4) Observers for each "Select Layout" button
+      # 4. Observers for each select layout button
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observe({
         if (is.null(rv$extracted_layouts) || nrow(rv$extracted_layouts) == 0) return()
@@ -179,7 +174,7 @@ pptx_server <- function(id) {
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      # 5) Clear Template flow -> Return to Configs modal
+      # 5. Clear template logic + return to configs modal
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$clear_template, {
         log4r::info(.le$logger, "Clearing template")
@@ -193,9 +188,7 @@ pptx_server <- function(id) {
         ))
       })
 
-      # Confirm clearing
       shiny::observeEvent(input$confirm_clear, {
-        # Remove the old template
         if (!is.null(rv$uploaded_template) && file.exists(rv$uploaded_template$datapath)) {
           file.remove(rv$uploaded_template$datapath)
           log4r::info(.le$logger, "Template file removed")
@@ -204,28 +197,24 @@ pptx_server <- function(id) {
         rv$extracted_layouts <- NULL
         rv$selected_layout_idx <- NULL
 
-        # Replace the "Are you sure?" modal with a short "Template Cleared" modal
         shiny::removeModal()
 
         shiny::showModal(shiny::modalDialog(
           title = "Template Cleared",
           "The uploaded template has been removed, and a blank template will be used instead.",
-          # Instead of modalButton("Close"), we use a custom actionButton
           footer = htmltools::tagList(
             shiny::actionButton(ns("close_cleared_modal"), "Close")
           )
         ))
       })
 
-      # When user clicks "Close" on the "Template Cleared" modal,
-      # remove that modal, then re-show the config modal.
       shiny::observeEvent(input$close_cleared_modal, {
         shiny::removeModal()
-        showConfigModal()
+        showConfigModal() ## Show config modal after clearing
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      # 6) "Sync" Modal for uploading PPTX to sync images
+      # 6. Create sync modal for uploading & syncing PPTX
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$sync, {
         log4r::info(.le$logger, "Opening Sync Modal")
@@ -264,6 +253,8 @@ pptx_server <- function(id) {
         }
 
         input_pptx <- rv$uploaded_file$datapath
+        log4r::debug(.le$logger, paste0("Input PPTX file: ", input_pptx))
+
         output_pptx <- tempfile(fileext = ".pptx")
 
         shiny::showModal(shiny::modalDialog(
@@ -271,8 +262,6 @@ pptx_server <- function(id) {
           "Your PPTX file is being synced. This may take a few moments.",
           footer = NULL
         ))
-
-        log4r::debug(.le$logger, paste0("Input PPTX file: ", input_pptx))
 
         tryCatch({
           sync_images(input_pptx, output_pptx)
@@ -309,7 +298,7 @@ pptx_server <- function(id) {
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      # 7) Download PPTX (final creation)
+      # 7. Create initial PPTX with add_images
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observe({
         tryCatch({
@@ -337,20 +326,25 @@ pptx_server <- function(id) {
 
           remote_url <- gert::git_remote_info()$url
           repo_url   <- clean_url(remote_url)
+          log4r::debug(.le$logger, paste("Repo URL: ", repo_url))
+
           current_branch <- get_current_branch()
-          repo_url   <- paste0(repo_url, "/blob/", current_branch)
+          full_url   <- paste0(repo_url, "/blob/", current_branch)
+          log4r::debug(.le$logger, paste("Full URL: ", full_url))
 
           shiny::showModal(shiny::modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
           log4r::info(.le$logger, "Starting PowerPoint creation process")
-          start_time <- Sys.time()
 
           base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath
+
           chosen_layout_idx <- rv$selected_layout_idx
 
           tryCatch({
+            start_time <- Sys.time()
+
             add_images(
               files = selected_items(),
-              repo_url = repo_url,
+              repo_url = full_url,
               output_pptx = temp_pptx,
               slide_layout_index = chosen_layout_idx,
               base_pptx = base_pptx
