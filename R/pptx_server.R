@@ -139,7 +139,7 @@ pptx_server <- function(id) {
           layouts_df$image_path <- file.path("pptx_layouts", basename(layouts_df$image_path))
 
           rv$extracted_layouts <- layouts_df
-          log4r::info(.le$logger, paste0("Extracted ", nrow(layouts_df), " layouts from template."))
+          log4r::info(.le$logger, paste0("Extracted ", nrow(layouts_df), " layouts from template"))
 
         }, error = function(e) {
           log4r::error(.le$logger, paste0("Error extracting layouts: ", e$message))
@@ -193,6 +193,19 @@ pptx_server <- function(id) {
           file.remove(rv$uploaded_template$datapath)
           log4r::info(.le$logger, "Template file removed")
         }
+
+        old_layout_files <- list.files(
+          tempdir(),
+          pattern = "^layout_\\d+\\.png$",
+          full.names = TRUE
+        )
+        if (length(old_layout_files) > 0) {
+          unlink(old_layout_files, force = TRUE)
+          log4r::debug(.le$logger, paste("Removed old layout PNGs:", paste(old_layout_files, collapse = ", ")))
+        }
+
+        removeResourcePath("pptx_layouts")
+
         rv$uploaded_template <- NULL
         rv$extracted_layouts <- NULL
         rv$selected_layout_idx <- NULL

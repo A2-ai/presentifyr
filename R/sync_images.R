@@ -36,7 +36,7 @@ sync_images <- function(input_pptx,
   args <- c("run", script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict)
 
   if (is.null(getOption("venv_dir"))) {
-    log4r::info(.le$logger, "Setting options('venv_dir') to project root.")
+    log4r::info(.le$logger, "Setting options('venv_dir') to project root")
     message("Setting options('venv_dir') to project root")
 
     options("venv_dir" = here::here())
@@ -45,7 +45,7 @@ sync_images <- function(input_pptx,
   venv_path <- file.path(getOption("venv_dir"), ".venv")
 
   if (!dir.exists(venv_path)) {
-    log4r::error(.le$logger, "Virtual environment not found. Please initialize with initialize_python.")
+    log4r::error(.le$logger, "Virtual environment not found. Please initialize with initialize_python")
     stop("Create virtual environment with initialize_python")
   }
   log4r::debug(.le$logger, paste("venv_path resolved to: ", venv_path))

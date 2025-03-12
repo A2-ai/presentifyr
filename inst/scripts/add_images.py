@@ -5,23 +5,23 @@ from py_logger import get_logger
 
 def add_images_to_ppt(files, repo_url, output_pptx, slide_layout_index, base_pptx=None):
     logger = get_logger()
-    logger.debug(f"Starting add images Python function.")
+    logger.debug(f"Starting add images Python function")
   
     if base_pptx and os.path.exists(base_pptx):
         logger.debug(f"Using base PowerPoint template: {base_pptx}")
         my_pres = Presentation(base_pptx) 
     else:
-        logger.info("No valid PowerPoint template. Creating a blank presentation.")
+        logger.info("No valid PowerPoint template. Creating a blank presentation")
         my_pres = Presentation()
 
-    logger.debug(f"Total images to insert: {len(files)}.")
+    logger.debug(f"Total images to insert: {len(files)}")
     
     for i, file in enumerate(files, start=1):
         file_url = f"{repo_url}/{file}"
         sentinel_val = "{prfy}:"
         alt_text = f"{sentinel_val}{os.path.basename(file)}"
 
-        logger.info(f"Creating slide {i}/{len(files)} with image: {file}.")
+        logger.info(f"Creating slide {i}/{len(files)} with image: {file}")
         logger.debug(f"Using slide layout index: {slide_layout_index} for all slides")
 
         slide = my_pres.slides.add_slide(my_pres.slide_layouts[slide_layout_index])
@@ -34,7 +34,7 @@ def add_images_to_ppt(files, repo_url, output_pptx, slide_layout_index, base_ppt
 
         if placeholder:
             placeholder.insert_picture(file) ## Insert the image into the placeholder
-            logger.info(f"Image inserted into placeholder for slide {i}.")
+            logger.info(f"Image inserted into placeholder for slide {i}")
 
             ## Locate the new <p:pic> element created after image insertion
             try:
@@ -48,17 +48,17 @@ def add_images_to_ppt(files, repo_url, output_pptx, slide_layout_index, base_ppt
                 nv_cNvPr = pic_element.find('.//p:nvPicPr/p:cNvPr', namespaces)
                 if nv_cNvPr is not None:
                     nv_cNvPr.set("descr", alt_text)
-                    logger.debug(f"Alt text set for slide {i}: {alt_text}.")
+                    logger.debug(f"Alt text set for slide {i}: {alt_text}")
                 else:
-                    logger.warning(f"Failed to find <p:cNvPr> in <p:pic> for slide {i}.")
+                    logger.warning(f"Failed to find <p:cNvPr> in <p:pic> for slide {i}")
             except Exception as e:
-                logger.error(f"Error locating or updating <p:pic> for slide {i}: {e}.")
+                logger.error(f"Error locating or updating <p:pic> for slide {i}: {e}")
 
             notes_slide = slide.notes_slide
             notes_text_frame = notes_slide.notes_text_frame
             notes_text_frame.text = file_url
         else:
-            logger.warning(f"No content placeholder found on slide {i}. Skipping image placement.")
+            logger.warning(f"No content placeholder found on slide {i}. Skipping image placement")
 
     my_pres.save(output_pptx)
     logger.debug(f"PowerPoint saved as {output_pptx}")

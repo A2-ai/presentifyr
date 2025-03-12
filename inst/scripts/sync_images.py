@@ -7,7 +7,7 @@ from py_logger import get_logger
 
 def sync_images(input_pptx, output_pptx, image_dict):
     logger = get_logger()
-    logger.debug(f"Starting sync images Python function.")
+    logger.debug(f"Starting sync images Python function")
     
     presentation = Presentation(input_pptx)
     logger.debug(f"Using input .pptx file: {input_pptx}")
@@ -16,7 +16,7 @@ def sync_images(input_pptx, output_pptx, image_dict):
     end_pattern = r'\.[^.]+$'
     magic_pattern = re.compile(start_pattern + '.*?' + end_pattern)
 
-    logger.info("Scanning slides for image replacements...")
+    logger.info("Scanning slides for image replacements")
 
     for slide_index, slide in enumerate(presentation.slides, start=1):  
         match_found = False 
@@ -42,7 +42,7 @@ def sync_images(input_pptx, output_pptx, image_dict):
                     replacements.append((shape, image_path, alt_text))
                     match_found = True
                 else:
-                    logger.warning(f"Slide {slide_index}: No matching image found for {figure_name} or file does not exist.")
+                    logger.warning(f"Slide {slide_index}: No matching image found for {figure_name} or file does not exist")
 
         for shape, image_path, alt_text in replacements:
             left = shape.left
@@ -67,7 +67,7 @@ def sync_images(input_pptx, output_pptx, image_dict):
             logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path} with original dimensions and cropping maintained")
 
         if not match_found:
-            logger.warning(f"Slide {slide_index}: No matching alt-text for replacement.")
+            logger.warning(f"Slide {slide_index}: No matching alt-text for replacement")
 
     presentation.save(output_pptx)
     logger.debug(f"PowerPoint saved as {output_pptx}")
