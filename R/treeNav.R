@@ -45,22 +45,15 @@ include_imgs <- function() {
 #' @keywords internal
 #' @noRd
 list_files_and_dirs <- function(path,
-                                type = c("include", "exclude", "none"),
                                 pattern = NULL,
                                 all.files = FALSE) {
   log4r::debug(.le$logger, paste0("Listing files and directories for path: ", path))
 
-  type <- match.arg(type)
+  included_files <- fs::dir_ls(path = path, all = all.files, regexp = NULL, recurse = FALSE, ignore.case = TRUE)
 
-  # changed so pattern is only filtered out after retrieving all non filtered out values
-  included_files <- fs::dir_ls(path = path, all = all.files, regexp = NULL, recurse = F, ignore.case = TRUE)
+  included_files <- included_files[grepl(pattern, included_files) | fs::is_dir(included_files)]
 
   log4r::debug(.le$logger, paste0("Included files: ", paste(included_files, collapse = ", ")))
-
-  included_files <- switch(type,
-                           include = included_files[grepl(pattern, included_files) | fs::is_dir(included_files)],
-                           exclude = included_files[!grepl(pattern, included_files)], # this already includes dirs
-                           none = included_files)
 
   non_empty_dirs <- sapply(included_files, function(x) {
     if (fs::dir_exists(x)) {
@@ -70,7 +63,6 @@ list_files_and_dirs <- function(path,
     }
   })
 
-  # remove dirs w/o ANY files as otherwise will be unclickable dir
   if (any(!non_empty_dirs)) {
     included_files <- included_files[non_empty_dirs]
   }
@@ -79,7 +71,7 @@ list_files_and_dirs <- function(path,
   # w/ recurse to expose those files to show user as to why dir is not able to be indexed into
   # didn't reuse included_files because wanted only files rather than both files and dirs + recurse
   if (length(included_files) == 0) {
-    list_all <- fs::dir_ls(path = path, all = TRUE, regexp = NULL, recurse = T, ignore.case = TRUE, type = "file")
+    list_all <- fs::dir_ls(path = path, all = TRUE, regexp = NULL, recurse = TRUE, ignore.case = TRUE, type = "file")
     log4r::debug(.le$logger, paste0("All files (when included_files is empty): ", paste(list_all, collapse = ", ")))
     return(list(files = list_all, empty = TRUE))
   }
@@ -112,7 +104,6 @@ treeNavigatorServer <- function(id,
                                 wholerow = FALSE,
                                 contextMenu = FALSE,
                                 theme = "proton",
-                                type = "none",
                                 pattern = NULL,
                                 all.files = FALSE,
                                 ...) {
@@ -171,7 +162,7 @@ treeNavigatorServer <- function(id,
       full_path <- fs::path(dirname, input)
       log4r::debug(.le$logger, paste0("Full path constructed: ", full_path))
 
-      lf <- list_files_and_dirs(full_path, type = type, pattern = pattern, all.files = all.files)
+      lf <- list_files_and_dirs(full_path, pattern = pattern, all.files = all.files)
       log4r::debug(.le$logger, paste0("List files and dirs result: ", paste(lf$files, collapse = ", ")))
 
       # if no viable children found, send msg to revert state and open modal

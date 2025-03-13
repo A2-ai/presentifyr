@@ -4,7 +4,6 @@ pptx_server <- function(id) {
     id,
     rootFolder = getwd(),
     search = FALSE,
-    type = "include",
     pattern = include_imgs(),
     all.files = FALSE
   )
