@@ -38,14 +38,14 @@ include_imgs <- function() {
 #' Lists files and directories in a specified path, filtering out those that match a given pattern. It ensures that only non-empty directories are included in the list.
 #'
 #' @param path A character string specifying the file path to list files and directories from.
-#' @param pattern A character string containing the pattern to filter out files and directories. Default is NULL.
+#' @param pattern A character string containing the pattern to filter out files and directories.
 #' @param all.files A logical value indicating whether to list all files, including hidden files. Default is FALSE.
 #'
 #' @return A list containing files or directories as file paths.
 #' @keywords internal
 #' @noRd
 list_files_and_dirs <- function(path,
-                                pattern = NULL,
+                                pattern,
                                 all.files = FALSE) {
   log4r::debug(.le$logger, paste0("Listing files and directories for path: ", path))
 
