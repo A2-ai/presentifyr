@@ -47,11 +47,6 @@ get_current_branch <- function() {
     }
   )
 
-  if (branch_info$status != 0) {
-    log4r::error(.le$logger, "Git command did not return a valid branch.")
-    stop("Git command failed to return a valid branch.")
-  }
-
   current_branch <- trimws(branch_info$stdout)  ## Trim any whitespace or newlines
   log4r::debug(.le$logger, paste("Current branch resolved to:", current_branch))
 
