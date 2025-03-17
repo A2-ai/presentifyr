@@ -21,6 +21,7 @@ Imports:
     htmltools,
     jsTreeR (>= 2.6.0),
     log4r,
+    officer,
     pkglite (>= 0.2.2),
     processx (>= 3.8.4),
     shiny (>= 1.8.1.1),
