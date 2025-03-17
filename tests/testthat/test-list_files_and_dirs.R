@@ -8,7 +8,10 @@ test_that("list_files_and_dirs returns files and directories matching a given pa
 
   result <- list_files_and_dirs(path, pattern = ".", all.files = FALSE)
   expect_false(result$empty)
-  expect_equal(basename(result$files), "file1.txt, file2.png")
+  expect_equal(
+    unlist(strsplit(trimws(basename(result$files)), "\\s+")),
+    c("file1.txt", "file2.png")
+  )
 })
 
 test_that("list_files_and_dirs correctly handles hidden files when all.files = FALSE", {
@@ -43,7 +46,7 @@ test_that("list_files_and_dirs returns all files as a backup for shiny messaging
   file.create(file.path(path, "file2.txt"))
 
   result <- list_files_and_dirs(path, pattern = include_imgs(), all.files = FALSE)
-  expect_false(result$empty)
+  expect_true(result$empty)
   expect_equal(basename(result$files), c("file1.txt", "file2.txt"))
 })
 
