@@ -75,7 +75,6 @@ get_uv_path <- function() {
 #'
 #' @param directory The path to the directory where image files will be searched.
 #' @param recursive A logical value. If TRUE, searches for images recursively in subdirectories. Default is TRUE.
-#' @param full.names A logical value. If TRUE, returns full file paths; if FALSE, returns only file names. Default is TRUE.
 #' @param exclude_dirs A vector of directory names to exclude from the search. Default is NULL. If NULL, no directories are excluded.
 #'
 #' @return A character vector of image file paths.
@@ -83,7 +82,6 @@ get_uv_path <- function() {
 #' @noRd
 parse_directory_for_images <- function(directory,
                                        recursive = TRUE,
-                                       full.names = TRUE,
                                        exclude_dirs = NULL) {
   log4r::debug(.le$logger, paste("Parsing directory for images:", directory))
 
@@ -98,7 +96,7 @@ parse_directory_for_images <- function(directory,
     path = directory,
     pattern = image_pattern,
     recursive = recursive,
-    full.names = full.names,
+    full.names = TRUE,
     ignore.case = TRUE
   )
 
