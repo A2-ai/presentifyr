@@ -18,6 +18,12 @@ extract_layouts <- function(base_pptx,
     log4r::error(.le$logger, paste("The input base_pptx does not exist:", base_pptx))
     stop("Base PowerPoint file not found")
   }
+
+  if (!grepl("\\.pptx$", base_pptx, ignore.case = TRUE)) {
+    log4r::error(.le$logger, paste("Invalid file type. Expected a .pptx file:", base_pptx))
+    stop("Invalid file type. Expected a .pptx file.")
+  }
+
   log4r::debug(.le$logger, paste("Using provided base_pptx: ", base_pptx))
 
   args <- c("run", script, "-b", base_pptx, "-o", output_dir)
@@ -62,6 +68,10 @@ extract_layouts <- function(base_pptx,
   )
 
   parsed_indices <- as.integer(sub("layout_(\\d+)\\.png", "\\1", basename(layout_images)))
+
+  sorted_order <- order(parsed_indices)
+  parsed_indices <- parsed_indices[sorted_order]
+  layout_images <- layout_images[sorted_order]
 
   out_df <- data.frame(
     index = parsed_indices,
