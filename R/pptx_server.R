@@ -93,12 +93,14 @@ pptx_server <- function(id) {
 
       buildLayoutSelectionUI <- function() {
         layout_divs <- lapply(seq_len(nrow(rv$extracted_layouts)), function(i) {
-          layout_idx <- rv$extracted_layouts$index[i]
+          layout_name <- rv$extracted_layouts$layout_name[i]
+          image_path <- rv$extracted_layouts$image_path[i]
+
           htmltools::tags$div(
             style = "display:inline-block; margin: 10px; text-align:center;",
-            htmltools::tags$img(src = rv$extracted_layouts$image_path[i], width = "150px"),
-            htmltools::tags$p(paste("Layout:", layout_idx)),
-            shiny::actionButton(ns(paste0("btn_layout_", layout_idx)), paste("Select Layout", layout_idx))
+            htmltools::tags$img(src = image_path, width = "150px"),
+            htmltools::tags$p(paste("Layout:", layout_name)),
+            shiny::actionButton(ns(paste0("btn_layout_", layout_name)), paste("Select", layout_name))
           )
         })
 
@@ -156,12 +158,12 @@ pptx_server <- function(id) {
       shiny::observe({
         if (is.null(rv$extracted_layouts) || nrow(rv$extracted_layouts) == 0) return()
 
-        for (layout_idx in rv$extracted_layouts$index) {
+        for (layout_name in rv$extracted_layouts$layout_name) {
           local({
-            li <- layout_idx
-            shiny::observeEvent(input[[paste0("btn_layout_", li)]], {
-              rv$selected_layout_idx <- li
-              log4r::info(.le$logger, paste0("User selected layout index: ", li))
+            ln <- layout_name
+            shiny::observeEvent(input[[paste0("btn_layout_", ln)]], {
+              rv$selected_layout_name <- ln
+              log4r::info(.le$logger, paste0("User selected layout: ", ln))
             })
           })
         }
@@ -344,7 +346,7 @@ pptx_server <- function(id) {
 
           base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath
 
-          chosen_layout_idx <- rv$selected_layout_idx
+          chosen_layout <- rv$selected_layout_name
 
           tryCatch({
             start_time <- Sys.time()
@@ -353,7 +355,7 @@ pptx_server <- function(id) {
               files = selected_items(),
               repo_url = full_url,
               output_pptx = temp_pptx,
-              slide_layout_index = chosen_layout_idx,
+              slide_layout_name = chosen_layout,
               base_pptx = base_pptx
             )
 
