@@ -17,7 +17,6 @@ pptx_server <- function(id) {
       rv <- shiny::reactiveValues(
         uploaded_template = NULL,
         extracted_layouts = NULL,
-        selected_layout_idx = NULL,
         uploaded_file = NULL,
         processed_file = NULL
       )
@@ -76,10 +75,10 @@ pptx_server <- function(id) {
         }
 
         layout_label <- NULL
-        if (!is.null(rv$selected_layout_idx)) {
+        if (!is.null(rv$selected_layout_name)) {
           layout_label <- htmltools::tags$p(
             style = "font-weight:bold; color:green; margin-top:5px;", ## Green confirmation text
-            paste("Selected Layout:", rv$selected_layout_idx)
+            paste("Selected Layout:", rv$selected_layout_name)
           )
         }
 
@@ -204,7 +203,6 @@ pptx_server <- function(id) {
 
         rv$uploaded_template <- NULL
         rv$extracted_layouts <- NULL
-        rv$selected_layout_idx <- NULL
 
         shiny::removeModal()
 

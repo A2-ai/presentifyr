@@ -69,8 +69,8 @@ extract_layouts <- function(base_pptx,
 
   layout_names <- sub("\\.png$", "", basename(layout_images))  # Extract names without extension
 
-  sorted_order <- order(parsed_indices)
-  parsed_indices <- parsed_indices[sorted_order]
+  sorted_order <- order(layout_names)
+  layout_names <- layout_names[sorted_order]
   layout_images <- layout_images[sorted_order]
 
   out_df <- data.frame(
