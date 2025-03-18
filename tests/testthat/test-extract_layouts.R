@@ -24,7 +24,7 @@ test_that("extract_layouts fails when virtual environment does not exist", {
   output_dir <- tempfile()
   dir.create(output_dir)
 
-  mockery::stub(extract_layouts, "dir.exists", function(path) FALSE)  ## Simulate missing .venv
+  mockery::stub(extract_layouts, "dir.exists", function(path) FALSE)
 
   expect_error(extract_layouts(base_pptx, output_dir), "Create virtual environment with initialize_python")
 })
