@@ -45,7 +45,7 @@ initialize_python <- function() {
       args = args
     )
 
-    args_name <- c("venv_dir", "python-pptx.version", "uv.version", "python.version")
+    args_name <- c("venv_dir", "python-pptx.version", "pillow.version", "uv.version", "python.version")
     pyvers <- get_py_version(getOption("venv_dir"))
     if (!is.null(pyvers)) {
       args <- c(args, pyvers)
