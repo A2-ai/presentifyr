@@ -203,6 +203,7 @@ pptx_server <- function(id) {
 
         rv$uploaded_template <- NULL
         rv$extracted_layouts <- NULL
+        rv$selected_layout_name <- NULL
 
         shiny::removeModal()
 
