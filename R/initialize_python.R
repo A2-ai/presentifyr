@@ -20,6 +20,12 @@ initialize_python <- function() {
     args <- c(args, "1.0.2")
   }
 
+  if (!is.null(getOption("pillow.version"))) {
+    args <- c(args, getOption("pillow.version"))
+  } else {
+    args <- c(args, "11.1.0")
+  }
+
   if (!is.null(getOption("uv.version"))) {
     args <- c(args, getOption("uv.version"))
   } else {
