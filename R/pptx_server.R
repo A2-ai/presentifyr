@@ -191,7 +191,7 @@ pptx_server <- function(id) {
 
         old_layout_files <- list.files(
           tempdir(),
-          pattern = "^layout_\\d+\\.png$",
+          pattern = "\\.png$",
           full.names = TRUE
         )
         if (length(old_layout_files) > 0) {
@@ -403,7 +403,7 @@ pptx_server <- function(id) {
       session$onSessionEnded(function() {
         old_layout_files <- list.files(
           tempdir(),
-          pattern = "^layout_\\d+\\.png$",
+          pattern = "\\.png$",
           full.names = TRUE
         )
         if (length(old_layout_files) > 0) {
