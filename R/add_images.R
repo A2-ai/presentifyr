@@ -44,12 +44,28 @@ add_images <- function(files, repo_url, output_pptx,
     }
     slide_layout_index <- matched_index
   } else {
-    slide_layout_index <- 1 ## Default for officer::read_pptx() as of 0.6.6
+    slide_layout_index <- 2 ## Default for officer::read_pptx() as of 0.6.6
   }
 
   selected_layout <- layouts$layout[slide_layout_index]
   selected_master <- layouts$master[slide_layout_index]
   log4r::debug(.le$logger, paste("Selected layout:", selected_layout, "on master:", selected_master))
+
+  placeholders <- officer::layout_properties(ppt, selected_layout)
+
+  content_placeholder <- placeholders$ph_label[grepl("Content Placeholder 2", placeholders$ph_label)]
+
+  if (length(content_placeholder) == 0) {
+    log4r::error(.le$logger, paste("No content placeholder found"))
+    stop("No content placeholder found")
+  }
+
+  ## Extract bounding box (x=left, y=top, cx=width, cy=height in inches)
+  ph_info <- placeholders[placeholders$ph_label == content_placeholder, ]
+  ph_left   <- ph_info$offx[1]
+  ph_top    <- ph_info$offy[1]
+  ph_width  <- ph_info$cx[1]
+  ph_height <- ph_info$cy[1]
 
   log4r::info(.le$logger, paste("Total images to insert:", length(files)))
 
@@ -60,15 +76,6 @@ add_images <- function(files, repo_url, output_pptx,
 
     log4r::debug(.le$logger, paste("Creating slide", i, "of", length(files), "with image:", file))
     ppt <- officer::add_slide(ppt, layout = selected_layout, master = selected_master)
-
-    placeholders <- officer::layout_properties(ppt, selected_layout)
-
-    content_placeholder <- placeholders$ph_label[grepl("Content Placeholder 2", placeholders$ph_label)]
-
-    if (length(content_placeholder) == 0) {
-      log4r::error(.le$logger, paste("No content placeholder found for slide", i))
-      stop("No content placeholder found for slide")
-    }
 
     for (ph_label in placeholders$ph_label) {
       if (ph_label != content_placeholder &&
@@ -81,13 +88,6 @@ add_images <- function(files, repo_url, output_pptx,
         )
       }
     }
-
-    ## Extract bounding box (x=left, y=top, cx=width, cy=height in inches)
-    ph_info <- placeholders[placeholders$ph_label == content_placeholder, ]
-    ph_left   <- ph_info$offx[1]
-    ph_top    <- ph_info$offy[1]
-    ph_width  <- ph_info$cx[1]
-    ph_height <- ph_info$cy[1]
 
     log4r::debug(.le$logger, paste("Placeholder bounding box:",
                                    "left=", ph_left, "top=", ph_top,
@@ -139,4 +139,3 @@ add_images <- function(files, repo_url, output_pptx,
   message(sprintf("PowerPoint saved as %s", output_pptx))
   log4r::info(.le$logger, paste("PowerPoint saved as", output_pptx))
 }
-
