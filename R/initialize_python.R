@@ -74,7 +74,7 @@ initialize_python <- function() {
 #'
 #' @param venv_dir The file path to the .venv directory
 #'
-#' @return A string of python version or NULL
+#' @return A string of python version or NULL.
 #' @keywords internal
 #' @noRd
 get_py_version <- function(venv_dir) {

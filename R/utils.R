@@ -6,12 +6,16 @@
 #' @keywords internal
 #' @noRd
 clean_url <- function(remote_url) {
+  log4r::debug(.le$logger, paste("Received remote_url:", remote_url))
+
   if (grepl("^https://", remote_url)) {
     url <- paste0(dirname(remote_url), "/", basename(getwd())) ## To remove .git at end of url
+    log4r::debug(.le$logger, paste("HTTPS URL cleaned to:", url))
     return(url)
   }
 
   if (!grepl("^git@github\\.com:", remote_url)) {
+    log4r::error(.le$logger, paste("Invalid SSH URL:", remote_url))
     stop("The provided URL is not a valid SSH Key.")
   }
 
@@ -20,6 +24,7 @@ clean_url <- function(remote_url) {
   repo <- sub(".git$", "", parts[3])
 
   https_url <- paste0(username, "/", repo)
+  log4r::debug(.le$logger, paste("Converted SSH URL to:", https_url))
 
   return(https_url)
 }
@@ -30,9 +35,20 @@ clean_url <- function(remote_url) {
 #' @keywords internal
 #' @noRd
 get_current_branch <- function() {
-  branch_info <- processx::run("git", args = c("symbolic-ref", "--short", "HEAD"))
+  branch_info <- tryCatch(
+    {
+      processx::run("git", args = c("symbolic-ref", "--short", "HEAD"))
+    },
+    error = function(e) {
+      log4r::error(.le$logger, paste0("Failed to retrieve Git branch. Status: ", e$status))
+      log4r::error(.le$logger, paste0("Failed to retrieve Git branch. Stderr: ", e$stderr))
+      log4r::info(.le$logger, paste0("Failed to retrieve Git branch. Stdout: ", e$stdout))
+      stop("Error retrieving current Git branch.")
+    }
+  )
 
   current_branch <- trimws(branch_info$stdout)  ## Trim any whitespace or newlines
+  log4r::debug(.le$logger, paste("Current branch resolved to:", current_branch))
 
   return(current_branch)
 }
@@ -59,7 +75,6 @@ get_uv_path <- function() {
 #'
 #' @param directory The path to the directory where image files will be searched.
 #' @param recursive A logical value. If TRUE, searches for images recursively in subdirectories. Default is TRUE.
-#' @param full.names A logical value. If TRUE, returns full file paths; if FALSE, returns only file names. Default is TRUE.
 #' @param exclude_dirs A vector of directory names to exclude from the search. Default is NULL. If NULL, no directories are excluded.
 #'
 #' @return A character vector of image file paths.
@@ -67,29 +82,35 @@ get_uv_path <- function() {
 #' @noRd
 parse_directory_for_images <- function(directory,
                                        recursive = TRUE,
-                                       full.names = TRUE,
                                        exclude_dirs = NULL) {
+  log4r::debug(.le$logger, paste("Parsing directory for images:", directory))
+
   if (!dir.exists(directory)) {
+    log4r::error(.le$logger, paste("Directory does not exist:", directory))
     stop("The specified directory does not exist.")
   }
 
-  image_pattern <- "\\.(png|jpg|jpeg|gif|bmp|tiff|webp)$"
+  image_pattern <- include_imgs()
 
   image_files <- list.files(
     path = directory,
     pattern = image_pattern,
     recursive = recursive,
-    full.names = full.names,
+    full.names = TRUE,
     ignore.case = TRUE
   )
+
+  log4r::debug(.le$logger, paste("Found", length(image_files), "image file(s)."))
 
   if (!is.null(exclude_dirs) && length(image_files) > 0) {
     exclude_pattern <- paste0(exclude_dirs, collapse = "|")
     image_files <- image_files[!grepl(exclude_pattern, image_files, ignore.case = TRUE)]
+    log4r::info(.le$logger, paste("Excluded directories:", paste(exclude_dirs, collapse = ", ")))
+    log4r::debug(.le$logger, paste("Remaining", length(image_files), "image file(s) after exclusion."))
   }
 
   if (length(image_files) == 0) {
-    message("No image files found in the specified directory.")
+    log4r::info(.le$logger, "No image files found in the specified directory.")
   }
 
   return(image_files)

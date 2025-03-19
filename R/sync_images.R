@@ -20,10 +20,20 @@ sync_images <- function(input_pptx,
     stop(paste("The input .pptx file does not exist:", input_pptx))
   }
 
+  if (!grepl("\\.pptx$", input_pptx, ignore.case = TRUE)) {
+    log4r::error(.le$logger, paste("Invalid file type. Expected a .pptx file:", input_pptx))
+    stop("Invalid file type. Expected a .pptx file.")
+  }
+
   image_files <- parse_directory_for_images(
     directory = here::here(),
     exclude_dirs = c("/renv/") ## Exclude unnecessary directories
   )
+
+  if (length(image_files) == 0 || all(image_files == "")) {
+    log4r::error(.le$logger, paste("No image files found. Execution halted."))
+    stop("No image files found. Execution halted.")
+  }
 
   log4r::debug(.le$logger, paste0("Found ", length(image_files), " image files"))
 

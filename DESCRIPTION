@@ -17,16 +17,18 @@ Imports:
     jsonlite,
     fs (>= 1.6.4),
     gert (>= 2.1.0),
-    glue,
     here (>= 1.0.1),
     htmltools,
     jsTreeR (>= 2.6.0),
     log4r,
+    magick,
+    officer,
     pkglite (>= 0.2.2),
     processx (>= 3.8.4),
     shiny (>= 1.8.1.1),
     stats
-Suggests: 
+Suggests:
+    mockery (>= 0.4.4),
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 LazyData: true

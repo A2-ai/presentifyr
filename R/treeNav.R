@@ -24,21 +24,6 @@ generate_excluded_file_message <- function(excluded_files) {
   return(messages)
 }
 
-#' Generates patterns to exclude binary files and specific directories, such as the `renv` directory, from a file listing.
-#'
-#' @return A character string containing the exclusion patterns.
-#' @keywords internal
-#' @noRd
-exclude_patterns <- function() {
-  exclude_pattern <- paste0("\\.(", paste(pkglite::ext_binary(flat = TRUE), collapse = "|"), ")$", collapse = "")
-
-  exclude_pattern <- c(exclude_pattern, "\\brenv\\b")
-
-  exclude_pattern <- paste(exclude_pattern, collapse = "|")
-
-  return(exclude_pattern)
-}
-
 #' Generates a regular expression pattern to include files.
 #'
 #' @return A regular expression pattern.
@@ -53,29 +38,22 @@ include_imgs <- function() {
 #' Lists files and directories in a specified path, filtering out those that match a given pattern. It ensures that only non-empty directories are included in the list.
 #'
 #' @param path A character string specifying the file path to list files and directories from.
-#' @param pattern A character string containing the pattern to filter out files and directories. Default is NULL.
+#' @param pattern A character string containing the pattern to filter out files and directories.
 #' @param all.files A logical value indicating whether to list all files, including hidden files. Default is FALSE.
 #'
-#' @return A list containing two
+#' @return A list containing files or directories as file paths.
 #' @keywords internal
 #' @noRd
 list_files_and_dirs <- function(path,
-                                type = c("include", "exclude", "none"),
-                                pattern = NULL,
+                                pattern,
                                 all.files = FALSE) {
-  log4r::debug(.le$logger, glue::glue("Listing files and directories for path: {path}"))
+  log4r::debug(.le$logger, paste0("Listing files and directories for path: ", path))
 
-  type <- match.arg(type)
+  included_files <- fs::dir_ls(path = path, all = all.files, regexp = NULL, recurse = FALSE, ignore.case = TRUE)
 
-  # changed so pattern is only filtered out after retrieving all non filtered out values
-  included_files <- fs::dir_ls(path = path, all = all.files, regexp = NULL, recurse = F, ignore.case = TRUE)
+  included_files <- included_files[grepl(pattern, included_files) | fs::is_dir(included_files)]
 
-  log4r::debug(.le$logger, glue::glue("Included files: {paste(included_files, collapse = ', ')}"))
-
-  included_files <- switch(type,
-                           include = included_files[grepl(pattern, included_files) | fs::is_dir(included_files)],
-                           exclude = included_files[!grepl(pattern, included_files)], # this already includes dirs
-                           none = included_files)
+  log4r::debug(.le$logger, paste0("Included files: ", paste(included_files, collapse = ", ")))
 
   non_empty_dirs <- sapply(included_files, function(x) {
     if (fs::dir_exists(x)) {
@@ -85,7 +63,6 @@ list_files_and_dirs <- function(path,
     }
   })
 
-  # remove dirs w/o ANY files as otherwise will be unclickable dir
   if (any(!non_empty_dirs)) {
     included_files <- included_files[non_empty_dirs]
   }
@@ -94,8 +71,8 @@ list_files_and_dirs <- function(path,
   # w/ recurse to expose those files to show user as to why dir is not able to be indexed into
   # didn't reuse included_files because wanted only files rather than both files and dirs + recurse
   if (length(included_files) == 0) {
-    list_all <- fs::dir_ls(path = path, all = TRUE, regexp = NULL, recurse = T, ignore.case = TRUE, type = "file")
-    log4r::debug(.le$logger, glue::glue("All files (when included_files is empty): {paste(list_all, collapse = ', ')}"))
+    list_all <- fs::dir_ls(path = path, all = TRUE, regexp = NULL, recurse = TRUE, ignore.case = TRUE, type = "file")
+    log4r::debug(.le$logger, paste0("All files (when included_files is empty): ", paste(list_all, collapse = ", ")))
     return(list(files = list_all, empty = TRUE))
   }
 
@@ -127,18 +104,17 @@ treeNavigatorServer <- function(id,
                                 wholerow = FALSE,
                                 contextMenu = FALSE,
                                 theme = "proton",
-                                type = "none",
                                 pattern = NULL,
                                 all.files = FALSE,
                                 ...) {
   theme <- match.arg(theme, c("default", "proton"))
 
   shiny::moduleServer(id, function(input, output, session) {
-    log4r::debug(.le$logger, glue::glue("Initializing treeNavigatorServer module with id: {id}"))
+    log4r::debug(.le$logger, paste0("Initializing treeNavigatorServer module with id: ", id))
 
     output[["treeNavigator"]] <- jsTreeR::renderJstree({
       shiny::req(...)
-      log4r::debug(.le$logger, glue::glue("Rendering jstree for rootFolder: {rootFolder}"))
+      log4r::debug(.le$logger, paste0("Rendering jstree for rootFolder: ", rootFolder))
 
       suppressMessages(jsTreeR::jstree(
         nodes = list(
@@ -176,7 +152,7 @@ treeNavigatorServer <- function(id,
     # example: given input "testTree/inst/www", full_path will be "/path/to/proj/testTree/inst/www"
     shiny::observeEvent(input[["path_from_js"]], {
       input <- input[["path_from_js"]]
-      log4r::debug(.le$logger, glue::glue("Received path_from_js input: {paste(input, collapse = ', ')}"))
+      log4r::debug(.le$logger, paste0("Received path_from_js input: ", paste(input, collapse = ", ")))
 
       # null is sent back to reset the input if user wants to reselect unviable dirs
       if (is.null(input)) {
@@ -184,10 +160,10 @@ treeNavigatorServer <- function(id,
         return()
       }
       full_path <- fs::path(dirname, input)
-      log4r::debug(.le$logger, glue::glue("Full path constructed: {full_path}"))
+      log4r::debug(.le$logger, paste0("Full path constructed: ", full_path))
 
-      lf <- list_files_and_dirs(full_path, type = type, pattern = pattern, all.files = all.files)
-      log4r::debug(.le$logger, glue::glue("List files and dirs result: {paste(lf$files, collapse = ', ')}"))
+      lf <- list_files_and_dirs(full_path, pattern = pattern, all.files = all.files)
+      log4r::debug(.le$logger, paste0("List files and dirs result: ", paste(lf$files, collapse = ", ")))
 
       # if no viable children found, send msg to revert state and open modal
       # otherwise tree state will have miscalculated state and think node exists when it does not
@@ -215,7 +191,7 @@ treeNavigatorServer <- function(id,
     Paths <- shiny::reactiveVal()
     shiny::observeEvent(input[["treeNavigator_selected_paths"]], {
       selected <- input[["treeNavigator_selected_paths"]]
-      log4r::debug(.le$logger, glue::glue("Selected file paths: {paste(selected, collapse = ', ')}"))
+      log4r::debug(.le$logger, paste0("Selected file paths: ", paste(selected, collapse = ", ")))
 
       adjusted_paths <- sapply(selected, function(item) {
         fs::path_rel(item[["path"]], start = basename(rootFolder))
