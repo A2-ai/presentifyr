@@ -2,8 +2,9 @@
 #'
 #' @param files A list of image file paths to be inserted into the .pptx file.
 #' @param repo_url The url of the repository where an image is stored.
-#' @param base_pptx The file path to an existing .pptx file that serves as a template. Default is NULL. If NULL, a blank presentation is used.
 #' @param output_pptx The file path where the modified .pptx file will be saved.
+#' @param slide_layout_name A character string indicating the name of the PowerPoint slide layout to be used. Default is NULL. If NULL, slide_layout_index is set to 1.
+#' @param base_pptx The file path to an existing .pptx file that serves as a template. Default is NULL. If NULL, a blank presentation is used.
 #'
 #' @keywords internal
 #'
@@ -18,11 +19,8 @@
 add_images <- function(files, repo_url, output_pptx,
                        slide_layout_name = NULL, base_pptx = NULL) {
 
-  # Logging
   log4r::debug(.le$logger, "Starting add_images function")
-  log4r::debug(.le$logger, paste("Layout name:", slide_layout_name))
 
-  # 1. Load or create the PowerPoint
   if (!is.null(base_pptx) && file.exists(base_pptx)) {
     log4r::info(.le$logger, paste("Using base PowerPoint template:", base_pptx))
     ppt <- officer::read_pptx(base_pptx)
@@ -34,18 +32,19 @@ add_images <- function(files, repo_url, output_pptx,
   layouts <- officer::layout_summary(ppt)
   log4r::debug(.le$logger, paste("Available layouts:", paste(layouts$layout, collapse = ", ")))
 
-  # 2. Select a layout by name or default
   if (!is.null(slide_layout_name)) {
+    log4r::debug(.le$logger, paste("Name of slide layout being used:", slide_layout_name))
     normalized_layout_name <- trimws(tolower(gsub("_", " ", slide_layout_name)))
     normalized_layouts <- trimws(tolower(gsub("_", " ", layouts$layout)))
     matched_index <- match(normalized_layout_name, normalized_layouts)
 
     if (is.na(matched_index)) {
+      log4r::error(.le$logger, paste("Invalid layout name: ", slide_layout_name))
       stop("Invalid layout name '", slide_layout_name, "' not found in template.")
     }
     slide_layout_index <- matched_index
   } else {
-    slide_layout_index <- 1
+    slide_layout_index <- 1 ## Default for officer::read_pptx() as of 0.6.6
   }
 
   selected_layout <- layouts$layout[slide_layout_index]
@@ -54,7 +53,6 @@ add_images <- function(files, repo_url, output_pptx,
 
   log4r::info(.le$logger, paste("Total images to insert:", length(files)))
 
-  # 3. Loop over images
   for (i in seq_along(files)) {
     file <- files[i]
     file_url <- paste0(repo_url, "/", file)
@@ -63,35 +61,28 @@ add_images <- function(files, repo_url, output_pptx,
     log4r::debug(.le$logger, paste("Creating slide", i, "of", length(files), "with image:", file))
     ppt <- officer::add_slide(ppt, layout = selected_layout, master = selected_master)
 
-    # 3a. Identify placeholders in this layout
     placeholders <- officer::layout_properties(ppt, selected_layout)
 
-    # Suppose your image placeholder is labeled "Content Placeholder 2"
     content_placeholder <- placeholders$ph_label[grepl("Content Placeholder 2", placeholders$ph_label)]
+
     if (length(content_placeholder) == 0) {
-      # If no placeholder found, fill placeholders with blank text and skip image
-      log4r::warn(.le$logger, paste("No content placeholder found for slide", i))
-      for (ph_label in placeholders$ph_label) {
-        ppt <- officer::ph_with(
-          ppt, value = "",
-          location = officer::ph_location_label(ph_label = ph_label)
-        )
-      }
-      ppt <- officer::set_notes(ppt, value = file_url, location = officer::notes_location_type("body"))
-      next
+      log4r::error(.le$logger, paste("No content placeholder found for slide", i))
+      stop("No content placeholder found for slide")
     }
 
-    # 3b. Fill other placeholders with empty text
     for (ph_label in placeholders$ph_label) {
-      if (ph_label != content_placeholder) {
+      if (ph_label != content_placeholder &&
+          !grepl("Slide Number Placeholder", ph_label)) {
+
         ppt <- officer::ph_with(
-          ppt, value = "",
+          ppt,
+          value = "",
           location = officer::ph_location_label(ph_label = ph_label)
         )
       }
     }
 
-    # 3c. Extract bounding box (x=left, y=top, cx=width, cy=height in inches)
+    ## Extract bounding box (x=left, y=top, cx=width, cy=height in inches)
     ph_info <- placeholders[placeholders$ph_label == content_placeholder, ]
     ph_left   <- ph_info$offx[1]
     ph_top    <- ph_info$offy[1]
@@ -102,31 +93,23 @@ add_images <- function(files, repo_url, output_pptx,
                                    "left=", ph_left, "top=", ph_top,
                                    "width=", ph_width, "height=", ph_height))
 
-    # 3d. Read and scale the image
-    img <- tryCatch(
-      magick::image_read(file),
-      error = function(e) {
+    img <- tryCatch({
+      magick::image_read(file)
+      },error = function(e) {
         log4r::error(.le$logger, paste("Error reading file:", file, "-", e$message))
-        NULL
-      }
-    )
-    if (is.null(img)) {
-      next
-    }
+        stop(e)
+      })
 
     info <- magick::image_info(img)
     width_px  <- info$width
     height_px <- info$height
 
-    # For demonstration, assume 300 DPI (or 96, etc.).
-    # If you want the actual embedded DPI, parse info$density.
-    x_res <- 300
-    y_res <- 300
+    x_res <- 300 ## DPI used by PowerPoint auto-scaling
+    y_res <- 300 ## DPI used by PowerPoint auto-scaling
 
     raw_width_in  <- width_px  / x_res
     raw_height_in <- height_px / y_res
 
-    # Scale factor to fit bounding box
     scale_factor <- min(ph_width / raw_width_in, ph_height / raw_height_in)
     final_w <- raw_width_in  * scale_factor
     final_h <- raw_height_in * scale_factor
@@ -134,11 +117,9 @@ add_images <- function(files, repo_url, output_pptx,
     log4r::debug(.le$logger, paste("Scaled image size:",
                                    round(final_w, 2), "x", round(final_h, 2), "inches"))
 
-    # 3e. Compute new left, top to CENTER it in the bounding box
     centered_left <- ph_left + (ph_width  - final_w) / 2
     centered_top  <- ph_top  + (ph_height - final_h) / 2
 
-    # 3f. Insert at that position (not using ph_location_label)
     ppt <- officer::ph_with(
       ppt,
       value = officer::external_img(file, width = final_w, height = final_h, alt = alt_text),
@@ -152,11 +133,8 @@ add_images <- function(files, repo_url, output_pptx,
     )
     log4r::debug(.le$logger, paste("Image inserted, centered in placeholder for slide", i))
 
-    # 3g. Optionally add notes
     ppt <- officer::set_notes(ppt, value = file_url, location = officer::notes_location_type("body"))
   }
-
-  # 4. Save the PowerPoint
   print(ppt, target = output_pptx)
   message(sprintf("PowerPoint saved as %s", output_pptx))
   log4r::info(.le$logger, paste("PowerPoint saved as", output_pptx))
