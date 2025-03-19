@@ -72,12 +72,15 @@ test_that("extract_layouts correctly parses layout indices from filenames", {
 
   result <- extract_layouts(base_pptx, output_dir)
 
-  parsed_indices <- as.integer(sub("layout_(\\d+)\\.png", "\\1", basename(mock_images)))
-  sorted_order <- order(parsed_indices)
+  layout_names <- sub("\\.png$", "", basename(mock_images))  # Extract names without extension
+
+  sorted_order <- order(layout_names)
+  layout_names <- layout_names[sorted_order]
+  layout_images <- mock_images[sorted_order]
 
   expected_df <- data.frame(
-    index = parsed_indices[sorted_order],
-    image_path = mock_images[sorted_order],
+    layout_name = layout_names,
+    image_path = layout_images,
     stringsAsFactors = FALSE
   )
 
