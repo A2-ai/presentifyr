@@ -8,7 +8,7 @@ Authors@R:
     person("Matthew", "Smith", , "matthews@a2-ai.com", role = "aut"),
     person("Agnes", "Kim", , "agnes@a2-ai.com", role = "aut"),
     person("Devin", "Pastoor", , "devin@a2-ai.com", role = "aut"),
-    person("Jenna", "Johnson", , "jenna@a2-ai.com", role = "aut"),
+    person("Jenna", "Johnson", , "jenna@a2-ai.com", role = "aut")
   )
 Description: Create reproducible slideshows with PowerPoint and R. 
 License: GPL (>= 3)
