@@ -415,7 +415,7 @@ pptx_server <- function(id) {
         if ("pptx_layouts" %in% names(shiny::resourcePaths())) {
           shiny::removeResourcePath("pptx_layouts")
         }
-        log4r::info(.le$logger, "Session ended -> resource path 'pptx_layouts' removed.")
+        log4r::info(.le$logger, "Session ended, removed resource path 'pptx_layouts'")
       })
     }
   )
@@ -423,6 +423,6 @@ pptx_server <- function(id) {
 
 #' @noRd
 app_server <- function(input, output, session) {
-  log4r::info(.le$logger, "Initializing app server.")
+  log4r::info(.le$logger, "Initializing app server")
   pptx_server(id="app")
 }

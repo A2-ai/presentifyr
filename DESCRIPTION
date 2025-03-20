@@ -1,10 +1,16 @@
 Package: presentifyr
-Title: Creates and updates reproducible powerpoints
-Version: 0.0.0.9000
+Title: PowerPoint Precision, Shiny Simplicity
+Version: 0.1.0
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: Selects image files to write to pptx with their associated github link in the note section.
+    c(
+    person("Jacob", "Dumbleton", , "jacob@a2-ai.com", role = c("aut", "cre")),
+    person("Anne", "Zheng", , "anne@a2-ai.com", role = "aut"),
+    person("Matthew", "Smith", , "matthews@a2-ai.com", role = "aut"),
+    person("Agnes", "Kim", , "agnes@a2-ai.com", role = "aut"),
+    person("Devin", "Pastoor", , "devin@a2-ai.com", role = "aut"),
+    person("Jenna", "Johnson", , "jenna@a2-ai.com", role = "aut"),
+  )
+Description: Create reproducible slideshows with PowerPoint and R. 
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
