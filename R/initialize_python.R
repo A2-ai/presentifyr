@@ -20,6 +20,12 @@ initialize_python <- function() {
     args <- c(args, "1.0.2")
   }
 
+  if (!is.null(getOption("pillow.version"))) {
+    args <- c(args, getOption("pillow.version"))
+  } else {
+    args <- c(args, "11.1.0")
+  }
+
   if (!is.null(getOption("uv.version"))) {
     args <- c(args, getOption("uv.version"))
   } else {
@@ -39,7 +45,7 @@ initialize_python <- function() {
       args = args
     )
 
-    args_name <- c("venv_dir", "python-pptx.version", "uv.version", "python.version")
+    args_name <- c("venv_dir", "python-pptx.version", "pillow.version", "uv.version", "python.version")
     pyvers <- get_py_version(getOption("venv_dir"))
     if (!is.null(pyvers)) {
       args <- c(args, pyvers)

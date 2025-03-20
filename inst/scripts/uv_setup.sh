@@ -4,8 +4,8 @@
 
 # Check if uv is installed.
 if ! command -v uv &> /dev/null; then
-  echo "'uv' is not installed. Installing version $3..."
-  curl --proto '=https' --tlsv1.2 -LsSf "https://github.com/astral-sh/uv/releases/download/$3/uv-installer.sh" | sh
+  echo "'uv' is not installed. Installing version $4..."
+  curl --proto '=https' --tlsv1.2 -LsSf "https://github.com/astral-sh/uv/releases/download/$4/uv-installer.sh" | sh
 fi
 
 if ! grep -q 'export PATH="$HOME/.cargo/bin:$PATH"' $HOME/.bashrc; then
@@ -19,10 +19,10 @@ source $HOME/.bashrc
 
 if [ ! -d "$1/.venv" ]; then
   echo "Creating venv at $1/.venv"
-  if [ -n "$4" ]; then
-    uv venv "$1/.venv" --python="$4"  # Use the Python version provided in $4
+  if [ -n "$5" ]; then
+    uv venv "$1/.venv" --python="$5"  # Use the Python version provided in $5
   else
-    uv venv "$1/.venv"  # Default version if $4 is not provided
+    uv venv "$1/.venv"  # Default version if $5 is not provided
   fi
 fi
 
@@ -34,5 +34,14 @@ if ! python -c "import pptx" &> /dev/null; then
     uv pip install "python-pptx==$2"
   else
     uv pip install "python-pptx==1.0.2" # default version this branch should never run from R
+  fi
+fi
+
+# Check if pillow is installed, install it if not
+if ! python -c "import PIL" &> /dev/null; then
+  if [ -n "$3" ]; then
+    uv pip install "pillow==$3"
+  else
+    uv pip install "pillow==11.1.0" # default version this branch should never run from R
   fi
 fi

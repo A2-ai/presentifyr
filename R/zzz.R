@@ -56,6 +56,13 @@ presentifyr_options_message <- function() {
     set_options <- c(set_options, paste("python-pptx.version:", pptx_vers))
   }
 
+  pillow_vers <- getOption("pillow.version")
+  if (is.null(pillow_vers)) {
+    optional_options <- c(optional_options, "options('pillow.version') is not set. Default is 11.1.0")
+  } else {
+    set_options <- c(set_options, paste("pillow.version:", pillow_vers))
+  }
+
   ## Format .onAttach message
   msg <- ""
   if (length(set_options)) {

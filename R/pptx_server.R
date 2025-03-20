@@ -412,7 +412,9 @@ pptx_server <- function(id) {
           log4r::info(.le$logger, paste("Session ended, removed layout PNGs:", paste(old_layout_files, collapse = ", ")))
         }
 
-        shiny::removeResourcePath("pptx_layouts")
+        if ("pptx_layouts" %in% names(shiny::resourcePaths())) {
+          shiny::removeResourcePath("pptx_layouts")
+        }
         log4r::info(.le$logger, "Session ended -> resource path 'pptx_layouts' removed.")
       })
     }
