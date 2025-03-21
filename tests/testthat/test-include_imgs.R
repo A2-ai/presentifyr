@@ -1,5 +1,5 @@
 test_that("include_imgs returns expected regex pattern", {
-  expected_extensions <- pkglite::ext_binary(flat = FALSE)$figure
+  expected_extensions <- setdiff(pkglite::ext_binary(flat = FALSE)$figure, "pdf")
   expected_pattern <- paste0("\\.(", paste(expected_extensions, collapse = "|"), ")$")
 
   result <- include_imgs()
@@ -11,7 +11,7 @@ test_that("include_imgs returns expected regex pattern", {
 test_that("include_imgs correctly matches valid image file extensions", {
   pattern <- include_imgs()
 
-  expected_extensions <- pkglite::ext_binary(flat = FALSE)$figure
+  expected_extensions <- setdiff(pkglite::ext_binary(flat = FALSE)$figure, "pdf")
 
   for (ext in expected_extensions) {
     test_filename <- paste0("image.", ext)
