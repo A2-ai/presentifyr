@@ -385,8 +385,10 @@ pptx_server <- function(id) {
       output$show_files <- shiny::renderUI({
         htmltools::tagList(
           htmltools::tags$h6(
-            "These files reflect the current state of your local repository.
-             Please commit and push any changes or new files to GitHub to
+            "These files reflect the current state of your local repository.",
+            htmltools::tags$br(),
+            htmltools::tags$br(),
+             "Please commit and push any changes or new files to GitHub to
              ensure the links are up to date."
           ),
           htmltools::tags$ul(

@@ -30,7 +30,8 @@ generate_excluded_file_message <- function(excluded_files) {
 #' @keywords internal
 #' @noRd
 include_imgs <- function() {
-  pattern <- paste0("\\.(", paste(pkglite::ext_binary(flat = FALSE)$figure, collapse = "|"), ")$")
+  exts <- setdiff(pkglite::ext_binary(flat = FALSE)$figure, "pdf")
+  pattern <- paste0("\\.(", paste(exts, collapse = "|"), ")$")
 
   return(pattern)
 }
