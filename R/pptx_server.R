@@ -18,7 +18,8 @@ pptx_server <- function(id) {
         uploaded_template = NULL,
         extracted_layouts = NULL,
         uploaded_file = NULL,
-        processed_file = NULL
+        processed_file = NULL,
+        report_filename = NULL
       )
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -33,6 +34,11 @@ pptx_server <- function(id) {
         shiny::showModal(
           shiny::modalDialog(
             title = "Customize PPTX Configuration",
+            textInput(
+              ns("pptx_filename"),
+              label       = "PowerPoint File Name (Extension Not Required):",
+              placeholder = "presentation"
+            ),
             shiny::uiOutput(ns("configs_options")),
             htmltools::hr(),
             htmltools::tags$p("Please use the following to clear a provided PPTX template:"),
@@ -41,6 +47,10 @@ pptx_server <- function(id) {
           )
         )
       }
+
+      shiny::observeEvent(input$pptx_filename, {
+        rv$report_filename <- trimws(input$pptx_filename)
+      })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 2. UI for file input, template confirmation, layout selection
@@ -61,7 +71,7 @@ pptx_server <- function(id) {
         if (!is.null(rv$uploaded_template)) {
           template_name <- basename(rv$uploaded_template$name)
           template_label <- htmltools::tags$p(
-            style = "font-weight:bold; color:blue; margin-top:5px;", ## Blue confirmation text
+            style = "font-weight:bold; color:#e45600; margin-top:5px;",
             paste("Currently using template:", template_name)
           )
         }
@@ -77,12 +87,26 @@ pptx_server <- function(id) {
         layout_label <- NULL
         if (!is.null(rv$selected_layout_name)) {
           layout_label <- htmltools::tags$p(
-            style = "font-weight:bold; color:green; margin-top:5px;", ## Green confirmation text
+            style = "font-weight:bold; color:#e45600; margin-top:5px;",
             paste("Selected Layout:", rv$selected_layout_name)
           )
         }
 
+        filename_label <- NULL
+        if (!is.null(rv$report_filename) && nzchar(rv$report_filename)) {
+
+          display_name <- rv$report_filename
+          if (!grepl("\\.pptx$", display_name, ignore.case = TRUE))
+            display_name <- paste0(display_name, ".pptx")
+
+          filename_label <- htmltools::tags$p(
+            style = "font-weight:bold; color:#e45600; margin-top:5px;",
+            paste("Output file name:", display_name)
+          )
+        }
+
         shiny::tagList(
+          filename_label,
           file_upload_area,
           template_label,
           layout_area,
@@ -327,7 +351,15 @@ pptx_server <- function(id) {
 
       output$download <- shiny::downloadHandler(
         filename = function() {
-          paste("report.pptx")
+          base <- rv$report_filename
+          if (is.null(base) || base == "") {
+            "report.pptx"
+          } else {
+            base <- gsub("[^[:alnum:]_ -]", "_", base)
+            if (!grepl("\\.pptx$", base, ignore.case = TRUE))
+              base <- paste0(base, ".pptx")
+            base
+          }
         },
         content = function(file) {
           temp_pptx <- tempfile(fileext = ".pptx")
