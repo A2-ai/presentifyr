@@ -1,6 +1,6 @@
 Package: presentifyr
 Title: PowerPoint Precision, Shiny Simplicity
-Version: 0.1.0.9000
+Version: 0.1.0.9001
 Authors@R: 
     c(
     person("Jacob", "Dumbleton", , "jacob@a2-ai.com", role = c("aut", "cre")),
