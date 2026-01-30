@@ -1,7 +1,6 @@
 #' Adds images from file to a given PowerPoint presentation (.pptx) file.
 #'
 #' @param files A list of image file paths to be inserted into the .pptx file.
-#' @param repo_url The url of the repository where an image is stored.
 #' @param output_pptx The file path where the modified .pptx file will be saved.
 #' @param slide_layout_name A character string indicating the name of the PowerPoint slide layout to be used. Default is NULL. If NULL, slide_layout_index is set to 1.
 #' @param base_pptx The file path to an existing .pptx file that serves as a template. Default is NULL. If NULL, a blank presentation is used.
@@ -11,12 +10,11 @@
 #' @examples \dontrun{
 #' add_images(
 #'   files = files,
-#'   repo_url = repo_url,
 #'   base_pptx = NULL,
 #'   output_pptx = output_pptx
 #' )
 #' }
-add_images <- function(files, repo_url, output_pptx,
+add_images <- function(files, output_pptx,
                        slide_layout_name = NULL, base_pptx = NULL) {
 
   log4r::debug(.le$logger, "Starting add_images function")
@@ -71,7 +69,6 @@ add_images <- function(files, repo_url, output_pptx,
 
   for (i in seq_along(files)) {
     file <- files[i]
-    file_url <- paste0(repo_url, "/", file)
     alt_text <- paste0("{prfy}:", basename(file))
 
     log4r::debug(.le$logger, paste("Creating slide", i, "of", length(files), "with image:", file))
@@ -136,14 +133,10 @@ add_images <- function(files, repo_url, output_pptx,
     # Load metadata and format slide notes
     metadata <- load_image_metadata(file)
     if (!is.null(metadata)) {
-      notes_text <- format_slide_notes(metadata, file_url)
+      notes_text <- format_slide_notes(metadata)
       log4r::debug(.le$logger, paste("Formatted notes with metadata for:", file))
-    } else {
-      notes_text <- file_url
-      log4r::debug(.le$logger, paste("Using URL-only notes (no metadata) for:", file))
+      ppt <- officer::set_notes(ppt, value = notes_text, location = officer::notes_location_type("body"))
     }
-
-    ppt <- officer::set_notes(ppt, value = notes_text, location = officer::notes_location_type("body"))
   }
   print(ppt, target = output_pptx)
   message(sprintf("PowerPoint saved as %s", output_pptx))

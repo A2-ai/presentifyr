@@ -364,14 +364,6 @@ pptx_server <- function(id) {
         content = function(file) {
           temp_pptx <- tempfile(fileext = ".pptx")
 
-          remote_url <- gert::git_remote_info()$url
-          repo_url   <- clean_url(remote_url)
-          log4r::debug(.le$logger, paste("Repo URL: ", repo_url))
-
-          current_branch <- get_current_branch()
-          full_url   <- paste0(repo_url, "/blob/", current_branch)
-          log4r::debug(.le$logger, paste("Full URL: ", full_url))
-
           shiny::showModal(shiny::modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
           log4r::info(.le$logger, "Starting PowerPoint creation process")
 
@@ -384,7 +376,6 @@ pptx_server <- function(id) {
 
             add_images(
               files = selected_items(),
-              repo_url = full_url,
               output_pptx = temp_pptx,
               slide_layout_name = chosen_layout,
               base_pptx = base_pptx

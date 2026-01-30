@@ -45,27 +45,8 @@ sync_images <- function(input_pptx,
   jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
   log4r::debug(.le$logger, paste("Temporary image dictionary created at:", temp_image_dict))
 
-  ## Build repo URL for slide notes
-  repo_url <- tryCatch({
-    remotes <- gert::git_remote_list()
-    remote_url <- remotes$url[1]
-    base_url <- clean_url(remote_url)
-    current_branch <- get_current_branch()
-    full_url <- paste0("https://github.com/", base_url, "/blob/", current_branch)
-    log4r::debug(.le$logger, paste("Repo URL for notes:", full_url))
-    full_url
-  }, error = function(e) {
-    log4r::warn(.le$logger, paste("Could not construct repo URL:", e$message))
-    NULL
-  })
-
   script <- system.file("scripts/sync_images.py", package = "presentifyr")
   args <- c("run", script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict)
-
-  ## Add repo URL if available
-  if (!is.null(repo_url)) {
-    args <- c(args, "-r", repo_url)
-  }
 
   if (is.null(getOption("venv_dir"))) {
     log4r::info(.le$logger, "Setting options('venv_dir') to project root")

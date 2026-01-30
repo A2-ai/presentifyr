@@ -42,12 +42,11 @@ def load_metadata_for_image(image_path):
         return None
 
 
-def format_slide_notes(metadata, github_url):
-    """Format slide notes with metadata and GitHub URL.
+def format_slide_notes(metadata):
+    """Format slide notes with metadata.
 
     Args:
         metadata: dict containing the metadata (from load_metadata_for_image)
-        github_url: The GitHub URL for the image
 
     Returns:
         Formatted string for slide notes
@@ -88,14 +87,10 @@ def format_slide_notes(metadata, github_url):
     else:
         lines.append("Abbreviations: N/A")
 
-    # Add blank line and GitHub URL
-    lines.append('')
-    lines.append(github_url)
-
     return '\n'.join(lines)
 
 
-def sync_images(input_pptx, output_pptx, image_dict, repo_url=None):
+def sync_images(input_pptx, output_pptx, image_dict):
     logger = get_logger()
     logger.debug(f"Starting sync images Python function")
     
@@ -154,34 +149,27 @@ def sync_images(input_pptx, output_pptx, image_dict, repo_url=None):
             logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path} with original dimensions and cropping maintained")
 
         # Update slide notes if replacements were made
-        if replacements and repo_url:
+        if replacements:
             # Use the last replaced image for notes (typically one per slide)
-            _, last_image_path, last_alt_text = replacements[-1]
-
-            # Extract relative path from alt_text for GitHub URL
-            figure_name = last_alt_text.split(':')[1] if ':' in last_alt_text else os.path.basename(last_image_path)
-            github_url = f"{repo_url}/{figure_name}"
+            _, last_image_path, _ = replacements[-1]
 
             # Load metadata and format notes
             metadata = load_metadata_for_image(last_image_path)
             if metadata:
-                notes_text = format_slide_notes(metadata, github_url)
+                notes_text = format_slide_notes(metadata)
                 logger.debug(f"Slide {slide_index}: Formatted notes with metadata")
-            else:
-                notes_text = github_url
-                logger.debug(f"Slide {slide_index}: Using URL-only notes (no metadata)")
 
-            # Set slide notes
-            try:
-                notes_slide = slide.notes_slide
-                text_frame = notes_slide.notes_text_frame
-                if text_frame is not None:
-                    text_frame.text = notes_text
-                    logger.debug(f"Slide {slide_index}: Updated slide notes")
-                else:
-                    logger.warning(f"Slide {slide_index}: No notes text frame available")
-            except Exception as e:
-                logger.warning(f"Slide {slide_index}: Could not update notes - {e}")
+                # Set slide notes
+                try:
+                    notes_slide = slide.notes_slide
+                    text_frame = notes_slide.notes_text_frame
+                    if text_frame is not None:
+                        text_frame.text = notes_text
+                        logger.debug(f"Slide {slide_index}: Updated slide notes")
+                    else:
+                        logger.warning(f"Slide {slide_index}: No notes text frame available")
+                except Exception as e:
+                    logger.warning(f"Slide {slide_index}: Could not update notes - {e}")
 
         if not match_found:
             logger.warning(f"Slide {slide_index}: No matching alt-text for replacement")
@@ -194,7 +182,6 @@ if __name__ == "__main__":
     parser.add_argument('-i', '--input_pptx', type=str, required=True, help="Input pptx file path")
     parser.add_argument('-o', '--output_pptx', type=str, required=True, help="Output pptx file path")
     parser.add_argument('-d', '--image_dict', type=str, required=True, help="Path to JSON file containing image dictionary")
-    parser.add_argument('-r', '--repo_url', type=str, required=False, default=None, help="Repository URL for GitHub links in notes")
 
     args = parser.parse_args()
 
@@ -204,6 +191,5 @@ if __name__ == "__main__":
     sync_images(
         input_pptx=args.input_pptx,
         output_pptx=args.output_pptx,
-        image_dict=image_dict,
-        repo_url=args.repo_url
+        image_dict=image_dict
     )
