@@ -133,7 +133,17 @@ add_images <- function(files, repo_url, output_pptx,
     )
     log4r::debug(.le$logger, paste("Image inserted, centered in placeholder for slide", i))
 
-    ppt <- officer::set_notes(ppt, value = file_url, location = officer::notes_location_type("body"))
+    # Load metadata and format slide notes
+    metadata <- load_image_metadata(file)
+    if (!is.null(metadata)) {
+      notes_text <- format_slide_notes(metadata, file_url)
+      log4r::debug(.le$logger, paste("Formatted notes with metadata for:", file))
+    } else {
+      notes_text <- file_url
+      log4r::debug(.le$logger, paste("Using URL-only notes (no metadata) for:", file))
+    }
+
+    ppt <- officer::set_notes(ppt, value = notes_text, location = officer::notes_location_type("body"))
   }
   print(ppt, target = output_pptx)
   message(sprintf("PowerPoint saved as %s", output_pptx))

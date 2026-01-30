@@ -115,3 +115,84 @@ parse_directory_for_images <- function(directory,
 
   return(image_files)
 }
+
+#' Load metadata JSON for an image file
+#'
+#' @param image_path The path to the image file
+#'
+#' @return A list containing the metadata, or NULL if not found
+#' @keywords internal
+#' @noRd
+load_image_metadata <- function(image_path) {
+  # Construct metadata filename: {name}_{ext}_metadata.json
+  file_name <- basename(image_path)
+  file_dir <- dirname(image_path)
+  name_parts <- tools::file_path_sans_ext(file_name)
+  ext <- tools::file_ext(file_name)
+
+  metadata_filename <- paste0(name_parts, "_", ext, "_metadata.json")
+  metadata_path <- file.path(file_dir, metadata_filename)
+
+  log4r::debug(.le$logger, paste("Looking for metadata at:", metadata_path))
+
+  if (!file.exists(metadata_path)) {
+    log4r::warn(.le$logger, paste("Metadata file not found:", metadata_path))
+    return(NULL)
+  }
+
+  tryCatch({
+    metadata <- jsonlite::read_json(metadata_path)
+    log4r::debug(.le$logger, paste("Loaded metadata from:", metadata_path))
+    return(metadata)
+  }, error = function(e) {
+    log4r::error(.le$logger, paste("Error reading metadata file:", metadata_path, "-", e$message))
+    return(NULL)
+  })
+}
+
+#' Format slide notes with metadata and GitHub URL
+#'
+#' @param metadata A list containing the metadata (from load_image_metadata)
+#' @param github_url The GitHub URL for the image
+#'
+#' @return A formatted string for slide notes
+#' @keywords internal
+#' @noRd
+format_slide_notes <- function(metadata, github_url) {
+  lines <- character()
+
+  # Source: source_meta.path + source_meta.latest_time
+  source_path <- metadata$source_meta$path %||% ""
+  source_time <- metadata$source_meta$latest_time %||% ""
+  if (nzchar(source_path) && nzchar(source_time)) {
+    lines <- c(lines, paste0("Source: ", source_path, " ", source_time))
+  } else if (nzchar(source_path)) {
+    lines <- c(lines, paste0("Source: ", source_path))
+  } else {
+    lines <- c(lines, "Source: N/A")
+  }
+
+  # Notes: object_meta.footnotes.notes (joined with ". ")
+  notes_list <- metadata$object_meta$footnotes$notes
+  if (length(notes_list) > 0 && !all(notes_list == "")) {
+    notes_text <- paste(sapply(notes_list, function(n) {
+      if (!endsWith(n, ".")) paste0(n, ".") else n
+    }), collapse = " ")
+    lines <- c(lines, paste0("Notes: ", notes_text))
+  } else {
+    lines <- c(lines, "Notes: N/A")
+  }
+
+  # Abbreviations: object_meta.footnotes.abbreviations (comma-separated)
+  abbrev_list <- metadata$object_meta$footnotes$abbreviations
+  if (length(abbrev_list) > 0 && !all(abbrev_list == "")) {
+    lines <- c(lines, paste0("Abbreviations: ", paste(abbrev_list, collapse = ", ")))
+  } else {
+    lines <- c(lines, "Abbreviations: N/A")
+  }
+
+  # Add blank line and GitHub URL
+  lines <- c(lines, "", github_url)
+
+  return(paste(lines, collapse = "\n"))
+}
