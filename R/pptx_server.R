@@ -445,7 +445,11 @@ pptx_server <- function(id) {
           n_images <- length(slide_files)
 
           ## Show position selector if fewer images than placeholders
-          show_position_selector <- n_images < ph_count && ph_count > 1
+          slide_has_room <- n_images < ph_count
+          show_position_selector <- slide_has_room && ph_count > 1
+
+          ## Hide up/down arrows when slide has room (use slot selector instead)
+          show_reorder_arrows <- !slide_has_room
 
           file_items <- lapply(seq_along(slide_files), function(file_idx) {
             file <- slide_files[file_idx]
@@ -478,6 +482,27 @@ pptx_server <- function(id) {
               )
             }
 
+            ## Reorder arrows (only for full slides)
+            reorder_btns <- NULL
+            if (show_reorder_arrows) {
+              reorder_btns <- htmltools::tagList(
+                shiny::actionButton(
+                  ns(paste0("move_up_", global_idx)),
+                  shiny::icon("arrow-up"),
+                  class = "btn-sm btn-outline-secondary",
+                  style = "margin-left: 5px;",
+                  disabled = global_idx == 1
+                ),
+                shiny::actionButton(
+                  ns(paste0("move_down_", global_idx)),
+                  shiny::icon("arrow-down"),
+                  class = "btn-sm btn-outline-secondary",
+                  style = "margin-left: 5px;",
+                  disabled = global_idx == total_files
+                )
+              )
+            }
+
             htmltools::tags$div(
               style = "display: flex; align-items: center; padding: 5px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;",
               htmltools::tags$span(
@@ -485,20 +510,7 @@ pptx_server <- function(id) {
                 basename(file)
               ),
               position_btns,
-              shiny::actionButton(
-                ns(paste0("move_up_", global_idx)),
-                shiny::icon("arrow-up"),
-                class = "btn-sm btn-outline-secondary",
-                style = "margin-left: 5px;",
-                disabled = global_idx == 1
-              ),
-              shiny::actionButton(
-                ns(paste0("move_down_", global_idx)),
-                shiny::icon("arrow-down"),
-                class = "btn-sm btn-outline-secondary",
-                style = "margin-left: 5px;",
-                disabled = global_idx == total_files
-              ),
+              reorder_btns,
               if (show_split) {
                 shiny::actionButton(
                   ns(paste0("split_after_", global_idx)),
@@ -511,9 +523,9 @@ pptx_server <- function(id) {
             )
           })
 
-          ## Add merge button if this isn't the last slide
+          ## Add merge button only if this slide has room AND isn't the last slide
           merge_btn <- NULL
-          if (slide_idx < length(rv$slide_groups)) {
+          if (slide_has_room && slide_idx < length(rv$slide_groups)) {
             merge_btn <- htmltools::tags$div(
               style = "text-align: right; margin-top: 5px;",
               shiny::actionButton(
