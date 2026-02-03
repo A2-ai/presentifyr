@@ -432,7 +432,9 @@ pptx_server <- function(id) {
 
           file_items <- lapply(seq_along(slide_files), function(file_idx) {
             file <- slide_files[file_idx]
-            global_idx <- sum(sapply(rv$slide_groups[seq_len(slide_idx - 1)], length)) + file_idx
+            ## Calculate global index across all slides (lengths() is safer for empty lists)
+            prior_count <- if (slide_idx == 1) 0L else sum(lengths(rv$slide_groups[seq_len(slide_idx - 1)]))
+            global_idx <- prior_count + file_idx
 
             htmltools::tags$div(
               style = "display: flex; align-items: center; padding: 5px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;",
