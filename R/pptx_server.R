@@ -61,17 +61,22 @@ pptx_server <- function(id) {
       ## Separate renderUI for submit/clear buttons so fileInput doesn't re-render
       output$submit_template_btn <- shiny::renderUI({
         file_ready <- !is.null(input$uploaded_template)
+        template_loaded <- !is.null(rv$uploaded_template)
         htmltools::tags$div(
+          class = "shiny-input-container",
           style = "display: flex; gap: 10px;",
           shiny::actionButton(
             ns("submit_template"),
             "Submit Template",
-            disabled = !file_ready
+            disabled = !file_ready,
+            style = "flex: 1;"
           ),
           shiny::actionButton(
             ns("clear_template"),
             "Clear Template",
-            class = "btn-outline-secondary"
+            class = "btn-outline-secondary",
+            disabled = !template_loaded,
+            style = "flex: 1;"
           )
         )
       })
