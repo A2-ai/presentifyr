@@ -495,10 +495,9 @@ pptx_server <- function(id) {
             prior_count <- if (slide_idx == 1) 0L else sum(lengths(rv$slide_groups[seq_len(slide_idx - 1)]))
             global_idx <- prior_count + file_idx
 
-            ## Determine if this is the last image in this slide (for split button)
-            is_last_in_slide <- file_idx == length(slide_files)
-            ## Don't show split on very last image overall
-            show_split <- !is_last_in_slide || (is_last_in_slide && global_idx < total_files)
+            ## Show split button on all images except the first in each slide
+            ## "Split before" semantics: this image and everything after moves to new slide
+            show_split <- file_idx > 1
 
             ## Position selector buttons (only if room to choose)
             position_btns <- NULL
@@ -519,27 +518,28 @@ pptx_server <- function(id) {
               )
             }
 
-            ## Reorder arrows (only for full slides)
+            ## Reorder arrows (only for full slides, hide when not usable)
             reorder_btns <- NULL
             if (show_reorder_arrows) {
-              reorder_btns <- htmltools::tagList(
+              up_btn <- if (global_idx > 1) {
                 shiny::actionButton(
                   ns(paste0("move_up_", global_idx)),
                   shiny::icon("arrow-up"),
                   class = "btn-sm btn-outline-secondary",
                   style = "margin-left: 5px;",
-                  disabled = global_idx == 1,
                   title = "Move image up in order"
-                ),
+                )
+              }
+              down_btn <- if (global_idx < total_files) {
                 shiny::actionButton(
                   ns(paste0("move_down_", global_idx)),
                   shiny::icon("arrow-down"),
                   class = "btn-sm btn-outline-secondary",
                   style = "margin-left: 5px;",
-                  disabled = global_idx == total_files,
                   title = "Move image down in order"
                 )
-              )
+              }
+              reorder_btns <- htmltools::tagList(up_btn, down_btn)
             }
 
             htmltools::tags$div(
@@ -552,11 +552,11 @@ pptx_server <- function(id) {
               reorder_btns,
               if (show_split) {
                 shiny::actionButton(
-                  ns(paste0("split_after_", global_idx)),
+                  ns(paste0("split_before_", global_idx)),
                   shiny::icon("level-down-alt"),
                   class = "btn-sm btn-outline-primary",
                   style = "margin-left: 5px;",
-                  title = "Start new slide after this image"
+                  title = "Move this image to a new slide"
                 )
               }
             )
@@ -590,39 +590,45 @@ pptx_server <- function(id) {
         )
       })
 
+      ## Track created observers to prevent duplicates
+      .created_obs <- new.env(parent = emptyenv())
+      .created_obs$move <- integer(0)
+      .created_obs$merge <- integer(0)
+      .created_obs$pos <- character(0)
+
       ## Observers for move up/down buttons
       shiny::observe({
         shiny::req(rv$pending_files)
 
         for (i in seq_along(rv$pending_files)) {
-          local({
-            idx <- i
+          if (!(i %in% .created_obs$move)) {
+            local({
+              idx <- i
 
-            shiny::observeEvent(input[[paste0("move_up_", idx)]], {
-              if (idx > 1) {
+              shiny::observeEvent(input[[paste0("move_up_", idx)]], {
+                if (idx > 1) {
+                  files <- unlist(rv$slide_groups)
+                  files[c(idx - 1, idx)] <- files[c(idx, idx - 1)]
+                  rv$slide_groups <- regroup_files(files, rv$slide_groups)
+                }
+              }, ignoreInit = TRUE)
+
+              shiny::observeEvent(input[[paste0("move_down_", idx)]], {
                 files <- unlist(rv$slide_groups)
-                files[c(idx - 1, idx)] <- files[c(idx, idx - 1)]
-                rv$slide_groups <- regroup_files(files, rv$slide_groups)
-              }
-            }, ignoreInit = TRUE)
+                if (idx < length(files)) {
+                  files[c(idx, idx + 1)] <- files[c(idx + 1, idx)]
+                  rv$slide_groups <- regroup_files(files, rv$slide_groups)
+                }
+              }, ignoreInit = TRUE)
 
-            shiny::observeEvent(input[[paste0("move_down_", idx)]], {
-              files <- unlist(rv$slide_groups)
-              if (idx < length(files)) {
-                files[c(idx, idx + 1)] <- files[c(idx + 1, idx)]
-                rv$slide_groups <- regroup_files(files, rv$slide_groups)
-              }
-            }, ignoreInit = TRUE)
-
-            ## Split: create new slide after this image
-            shiny::observeEvent(input[[paste0("split_after_", idx)]], {
-              files <- unlist(rv$slide_groups)
-              if (idx < length(files)) {
+              ## Split before: this image and everything after moves to new slide
+              shiny::observeEvent(input[[paste0("split_before_", idx)]], {
                 ## Find which slide this index is in and split it
-                rv$slide_groups <- split_at_index(rv$slide_groups, idx)
-              }
-            }, ignoreInit = TRUE)
-          })
+                rv$slide_groups <- split_before_index(rv$slide_groups, idx)
+              }, ignoreInit = TRUE)
+            })
+            .created_obs$move <- c(.created_obs$move, i)
+          }
         }
       })
 
@@ -631,17 +637,20 @@ pptx_server <- function(id) {
         shiny::req(rv$slide_groups)
 
         for (s in seq_along(rv$slide_groups)) {
-          local({
-            slide_idx <- s
+          if (!(s %in% .created_obs$merge)) {
+            local({
+              slide_idx <- s
 
-            shiny::observeEvent(input[[paste0("merge_slide_", slide_idx)]], {
-              if (slide_idx < length(rv$slide_groups)) {
-                result <- merge_slides(rv$slide_groups, rv$slide_positions, slide_idx)
-                rv$slide_groups <- result$groups
-                rv$slide_positions <- result$positions
-              }
-            }, ignoreInit = TRUE)
-          })
+              shiny::observeEvent(input[[paste0("merge_slide_", slide_idx)]], {
+                if (slide_idx < length(rv$slide_groups)) {
+                  result <- merge_slides(rv$slide_groups, rv$slide_positions, slide_idx)
+                  rv$slide_groups <- result$groups
+                  rv$slide_positions <- result$positions
+                }
+              }, ignoreInit = TRUE)
+            })
+            .created_obs$merge <- c(.created_obs$merge, s)
+          }
         }
       })
 
@@ -652,15 +661,19 @@ pptx_server <- function(id) {
         for (s in seq_along(rv$slide_groups)) {
           for (f in seq_along(rv$slide_groups[[s]])) {
             for (p in seq_len(rv$placeholder_count)) {
-              local({
-                slide_idx <- s
-                file_idx <- f
-                pos <- p
+              obs_key <- paste0(s, "_", f, "_", p)
+              if (!(obs_key %in% .created_obs$pos)) {
+                local({
+                  slide_idx <- s
+                  file_idx <- f
+                  pos <- p
 
-                shiny::observeEvent(input[[paste0("pos_", slide_idx, "_", file_idx, "_", pos)]], {
-                  rv$slide_positions[[slide_idx]][file_idx] <- pos
-                }, ignoreInit = TRUE)
-              })
+                  shiny::observeEvent(input[[paste0("pos_", slide_idx, "_", file_idx, "_", pos)]], {
+                    rv$slide_positions[[slide_idx]][file_idx] <- pos
+                  }, ignoreInit = TRUE)
+                })
+                .created_obs$pos <- c(.created_obs$pos, obs_key)
+              }
             }
           }
         }
@@ -682,10 +695,9 @@ pptx_server <- function(id) {
         new_groups
       }
 
-      ## Helper to split slides at a global file index
-      split_at_index <- function(groups, global_idx) {
-        files <- unlist(groups)
-        positions <- unlist(rv$slide_positions)
+      ## Helper to split slides BEFORE a global file index
+      ## "Split before" semantics: this image and everything after moves to new slide
+      split_before_index <- function(groups, global_idx) {
         cumulative <- cumsum(lengths(groups))
 
         ## Find which slide contains this index
@@ -693,10 +705,10 @@ pptx_server <- function(id) {
         prior <- if (slide_idx == 1) 0 else cumulative[slide_idx - 1]
         local_idx <- global_idx - prior
 
-        ## Split the slide
+        ## Split the slide: before gets images 1 to local_idx-1, after gets local_idx to end
         slide_files <- groups[[slide_idx]]
-        before_files <- slide_files[seq_len(local_idx)]
-        after_files <- slide_files[(local_idx + 1):length(slide_files)]
+        before_files <- slide_files[seq_len(local_idx - 1)]
+        after_files <- slide_files[local_idx:length(slide_files)]
 
         ## Rebuild groups
         new_groups <- list()
@@ -707,15 +719,15 @@ pptx_server <- function(id) {
           new_positions <- rv$slide_positions[seq_len(slide_idx - 1)]
         }
 
+        ## Add before_files (will have at least 1 image since button only shows for file_idx > 1)
         new_groups <- c(new_groups, list(before_files))
-        ## Reset positions for split slides to default (1, 2, ...)
         new_positions <- c(new_positions, list(seq_len(length(before_files))))
 
-        if (length(after_files) > 0) {
-          new_groups <- c(new_groups, list(after_files))
-          new_positions <- c(new_positions, list(seq_len(length(after_files))))
-        }
+        ## Add after_files (this image and any following in the same slide)
+        new_groups <- c(new_groups, list(after_files))
+        new_positions <- c(new_positions, list(seq_len(length(after_files))))
 
+        ## Add remaining slides
         if (slide_idx < length(groups)) {
           new_groups <- c(new_groups, groups[(slide_idx + 1):length(groups)])
           new_positions <- c(new_positions, rv$slide_positions[(slide_idx + 1):length(groups)])
