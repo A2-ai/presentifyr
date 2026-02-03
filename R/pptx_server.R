@@ -38,15 +38,17 @@ pptx_server <- function(id) {
         shiny::showModal(
           shiny::modalDialog(
             title = "Customize PPTX Configuration",
+            ## Reduce spacing below modal title
+            htmltools::tags$style("
+              .modal-header { padding-bottom: 10px; margin-bottom: 0; }
+              .modal-body { padding-top: 10px; }
+            "),
             textInput(
               ns("pptx_filename"),
               label       = "PowerPoint File Name (Extension Not Required):",
               placeholder = "presentation"
             ),
             shiny::uiOutput(ns("configs_options")),
-            htmltools::hr(),
-            htmltools::tags$p("Please use the following to clear a provided PPTX template:"),
-            shiny::actionButton(ns("clear_template"), "Clear Template"),
             footer = shiny::modalButton("Close")
           )
         )
@@ -56,13 +58,21 @@ pptx_server <- function(id) {
         rv$report_filename <- trimws(input$pptx_filename)
       })
 
-      ## Separate renderUI for submit button so fileInput doesn't re-render
+      ## Separate renderUI for submit/clear buttons so fileInput doesn't re-render
       output$submit_template_btn <- shiny::renderUI({
         file_ready <- !is.null(input$uploaded_template)
-        shiny::actionButton(
-          ns("submit_template"),
-          "Submit Template",
-          disabled = !file_ready
+        htmltools::tags$div(
+          style = "display: flex; gap: 10px;",
+          shiny::actionButton(
+            ns("submit_template"),
+            "Submit Template",
+            disabled = !file_ready
+          ),
+          shiny::actionButton(
+            ns("clear_template"),
+            "Clear Template",
+            class = "btn-outline-secondary"
+          )
         )
       })
 
