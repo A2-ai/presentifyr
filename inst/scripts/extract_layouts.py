@@ -1,6 +1,7 @@
 import os
 import argparse
 import re
+import json
 from pptx import Presentation
 from PIL import Image, ImageDraw
 from py_logger import get_logger
@@ -27,22 +28,42 @@ def generate_layout_images(base_pptx, output_dir):
     height_px = int(width_px * aspect_ratio)
 
     layout_count = 0
+    layout_metadata = {}  ## Collect metadata for all layouts
+
     for i, layout in enumerate(prs.slide_layouts):
         layout_name = layout.name
         safe_layout_name = re.sub(r'[^\w\-_]', '_', layout_name)  # Replace spaces & special characters
 
-        usable_placeholder_count = sum(
-            1 for shape in layout.shapes
-            if shape.is_placeholder and shape.placeholder_format.type in USABLE_PLACEHOLDER_TYPES
-        )
+        ## Collect usable placeholders with their positions
+        usable_placeholders = []
+        for shape in layout.shapes:
+            if shape.is_placeholder and shape.placeholder_format.type in USABLE_PLACEHOLDER_TYPES:
+                usable_placeholders.append({
+                    "idx": shape.placeholder_format.idx,
+                    "type": int(shape.placeholder_format.type),
+                    "left_emu": shape.left,
+                    "top_emu": shape.top,
+                    "width_emu": shape.width,
+                    "height_emu": shape.height,
+                })
 
-        logger.debug(f"Layout '{layout_name}' (Index {i}) has {usable_placeholder_count} usable placeholder(s) (types {USABLE_PLACEHOLDER_TYPES})")
+        logger.debug(f"Layout '{layout_name}' (Index {i}) has {len(usable_placeholders)} usable placeholder(s) (types {USABLE_PLACEHOLDER_TYPES})")
 
-        if usable_placeholder_count < 1:
+        if len(usable_placeholders) < 1:
             logger.debug(f"Skipping layout '{layout_name}' (Index {i}) since it has no usable placeholders")
             continue
 
-        logger.info(f"Processing layout '{layout_name}' (Index {i}) ({usable_placeholder_count} usable placeholder(s))")
+        ## Sort placeholders by position: top-to-bottom, then left-to-right
+        usable_placeholders.sort(key=lambda p: (p["top_emu"], p["left_emu"]))
+
+        ## Store metadata for this layout
+        layout_metadata[safe_layout_name] = {
+            "layout_name": layout_name,
+            "placeholder_count": len(usable_placeholders),
+            "placeholders": usable_placeholders,
+        }
+
+        logger.info(f"Processing layout '{layout_name}' (Index {i}) ({len(usable_placeholders)} usable placeholder(s))")
 
         img = Image.new("RGB", (width_px, height_px), "white")
         draw = ImageDraw.Draw(img)
@@ -75,6 +96,12 @@ def generate_layout_images(base_pptx, output_dir):
         logger.debug(f"Saving thumbnail as '{img_path}'")
         img.save(img_path)
         layout_count += 1
+
+    ## Write metadata JSON
+    metadata_path = os.path.join(output_dir, "layout_metadata.json")
+    with open(metadata_path, "w") as f:
+        json.dump(layout_metadata, f, indent=2)
+    logger.debug(f"Saved layout metadata to '{metadata_path}'")
 
     logger.info(f"Generated {layout_count} layout image(s) in '{output_dir}'")
 

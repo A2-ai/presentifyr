@@ -19,7 +19,9 @@ pptx_server <- function(id) {
         extracted_layouts = NULL,
         uploaded_file = NULL,
         processed_file = NULL,
-        report_filename = NULL
+        report_filename = NULL,
+        slide_groups = NULL,        ## List of vectors for multi-image slides
+        pending_files = NULL        ## Files pending for preview
       )
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,11 +120,22 @@ pptx_server <- function(id) {
         layout_divs <- lapply(seq_len(nrow(rv$extracted_layouts)), function(i) {
           layout_name <- rv$extracted_layouts$layout_name[i]
           image_path <- rv$extracted_layouts$image_path[i]
+          placeholder_count <- rv$extracted_layouts$placeholder_count[i]
+
+          ## Build placeholder count badge
+          ph_badge <- if (!is.na(placeholder_count)) {
+            htmltools::tags$span(
+              style = "background: #e45600; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.85em;",
+              paste(placeholder_count, "slot(s)")
+            )
+          } else {
+            NULL
+          }
 
           htmltools::tags$div(
             style = "display:inline-block; margin: 10px; text-align:center;",
             htmltools::tags$img(src = image_path, width = "150px"),
-            htmltools::tags$p(paste("Layout:", layout_name)),
+            htmltools::tags$p(paste("Layout:", layout_name), ph_badge),
             shiny::actionButton(ns(paste0("btn_layout_", layout_name)), paste("Select", layout_name))
           )
         })
@@ -345,10 +358,157 @@ pptx_server <- function(id) {
         if (length(selected_items()) == 0) {
           shiny::actionButton(ns("no_files"), "No files selected", style = "pointer-events: none;")
         } else {
-          shiny::downloadButton(ns("download"), "Download pptx")
+          shiny::actionButton(ns("preview_slides"), "Preview & Download")
         }
       })
 
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      # 7a. Preview modal for slide arrangement
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      shiny::observeEvent(input$preview_slides, {
+        log4r::info(.le$logger, "Opening slide preview modal")
+
+        files <- selected_items()
+        rv$pending_files <- files
+
+        ## Determine placeholder count from selected layout
+        placeholder_count <- 1L
+        if (!is.null(rv$extracted_layouts) && !is.null(rv$selected_layout_name)) {
+          ## Convert selected layout name to safe name for lookup
+          safe_name <- gsub("[^\\w\\-_]", "_", rv$selected_layout_name, perl = TRUE)
+          layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == safe_name, ]
+          if (nrow(layout_row) > 0 && !is.na(layout_row$placeholder_count[1])) {
+            placeholder_count <- layout_row$placeholder_count[1]
+          }
+        }
+
+        ## Create initial slide groups (auto-distribute)
+        n_files <- length(files)
+        n_slides <- ceiling(n_files / placeholder_count)
+
+        slide_groups <- vector("list", n_slides)
+        for (i in seq_along(files)) {
+          slide_idx <- ceiling(i / placeholder_count)
+          if (is.null(slide_groups[[slide_idx]])) {
+            slide_groups[[slide_idx]] <- character(0)
+          }
+          slide_groups[[slide_idx]] <- c(slide_groups[[slide_idx]], files[i])
+        }
+        rv$slide_groups <- slide_groups
+
+        log4r::debug(.le$logger, paste("Preview:", n_files, "files,", placeholder_count, "placeholders,", n_slides, "slides"))
+
+        showPreviewModal(placeholder_count)
+      })
+
+      showPreviewModal <- function(placeholder_count) {
+        shiny::showModal(
+          shiny::modalDialog(
+            title = "Preview Slide Arrangement",
+            size = "l",
+            htmltools::tags$p(
+              paste0("Layout has ", placeholder_count, " placeholder(s) per slide. ",
+                     "Images will be distributed across ", length(rv$slide_groups), " slide(s).")
+            ),
+            htmltools::tags$p(
+              style = "color: #666; font-size: 0.9em;",
+              "Use the arrows to reorder images. Images are grouped into slides based on their order."
+            ),
+            htmltools::hr(),
+            shiny::uiOutput(ns("preview_slides_ui")),
+            footer = htmltools::tagList(
+              shiny::downloadButton(ns("download"), "Generate PPTX"),
+              shiny::modalButton("Cancel")
+            )
+          )
+        )
+      }
+
+      output$preview_slides_ui <- shiny::renderUI({
+        shiny::req(rv$slide_groups)
+
+        slide_divs <- lapply(seq_along(rv$slide_groups), function(slide_idx) {
+          slide_files <- rv$slide_groups[[slide_idx]]
+
+          file_items <- lapply(seq_along(slide_files), function(file_idx) {
+            file <- slide_files[file_idx]
+            global_idx <- sum(sapply(rv$slide_groups[seq_len(slide_idx - 1)], length)) + file_idx
+
+            htmltools::tags$div(
+              style = "display: flex; align-items: center; padding: 5px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;",
+              htmltools::tags$span(
+                style = "flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;",
+                basename(file)
+              ),
+              shiny::actionButton(
+                ns(paste0("move_up_", global_idx)),
+                shiny::icon("arrow-up"),
+                class = "btn-sm btn-outline-secondary",
+                style = "margin-left: 5px;",
+                disabled = global_idx == 1
+              ),
+              shiny::actionButton(
+                ns(paste0("move_down_", global_idx)),
+                shiny::icon("arrow-down"),
+                class = "btn-sm btn-outline-secondary",
+                style = "margin-left: 5px;",
+                disabled = global_idx == length(rv$pending_files)
+              )
+            )
+          })
+
+          htmltools::tags$div(
+            style = "border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px;",
+            htmltools::tags$h5(paste("Slide", slide_idx), style = "margin-top: 0;"),
+            do.call(htmltools::tagList, file_items)
+          )
+        })
+
+        do.call(htmltools::tagList, slide_divs)
+      })
+
+      ## Observers for move up/down buttons
+      shiny::observe({
+        shiny::req(rv$pending_files)
+
+        for (i in seq_along(rv$pending_files)) {
+          local({
+            idx <- i
+
+            shiny::observeEvent(input[[paste0("move_up_", idx)]], {
+              if (idx > 1) {
+                files <- unlist(rv$slide_groups)
+                files[c(idx - 1, idx)] <- files[c(idx, idx - 1)]
+                rv$slide_groups <- regroup_files(files, rv$slide_groups)
+              }
+            }, ignoreInit = TRUE)
+
+            shiny::observeEvent(input[[paste0("move_down_", idx)]], {
+              files <- unlist(rv$slide_groups)
+              if (idx < length(files)) {
+                files[c(idx, idx + 1)] <- files[c(idx + 1, idx)]
+                rv$slide_groups <- regroup_files(files, rv$slide_groups)
+              }
+            }, ignoreInit = TRUE)
+          })
+        }
+      })
+
+      ## Helper to regroup files maintaining slide sizes
+      regroup_files <- function(files, current_groups) {
+        sizes <- sapply(current_groups, length)
+        new_groups <- vector("list", length(sizes))
+        file_idx <- 1
+        for (i in seq_along(sizes)) {
+          new_groups[[i]] <- files[file_idx:(file_idx + sizes[i] - 1)]
+          file_idx <- file_idx + sizes[i]
+        }
+        new_groups
+      }
+
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      # 7b. Download handler (now triggered from preview modal)
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$download <- shiny::downloadHandler(
         filename = function() {
           base <- rv$report_filename
@@ -364,6 +524,7 @@ pptx_server <- function(id) {
         content = function(file) {
           temp_pptx <- tempfile(fileext = ".pptx")
 
+          shiny::removeModal()
           shiny::showModal(shiny::modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
           log4r::info(.le$logger, "Starting PowerPoint creation process")
 
@@ -375,10 +536,11 @@ pptx_server <- function(id) {
             start_time <- Sys.time()
 
             add_images(
-              files = selected_items(),
+              files = unlist(rv$slide_groups),  ## Flatten for backward compat if needed
               output_pptx = temp_pptx,
               slide_layout_name = chosen_layout,
-              base_pptx = base_pptx
+              base_pptx = base_pptx,
+              slide_groups = rv$slide_groups    ## Pass groupings for multi-image
             )
 
             file.copy(temp_pptx, file)
