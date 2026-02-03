@@ -459,7 +459,10 @@ pptx_server <- function(id) {
             htmltools::hr(),
             shiny::uiOutput(ns("preview_slides_ui")),
             footer = htmltools::tagList(
-              shiny::downloadButton(ns("download"), "Generate PPTX"),
+              htmltools::tags$span(
+                title = "Generate and download the PowerPoint file",
+                shiny::downloadButton(ns("download"), "Generate PPTX")
+              ),
               shiny::modalButton("Cancel")
             )
           )
@@ -509,7 +512,8 @@ pptx_server <- function(id) {
                     ns(paste0("pos_", slide_idx, "_", file_idx, "_", p)),
                     as.character(p),
                     class = btn_class,
-                    style = "padding: 2px 8px; margin: 0 1px;"
+                    style = "padding: 2px 8px; margin: 0 1px;",
+                    title = paste("Place image in slot", p)
                   )
                 })
               )
@@ -524,14 +528,16 @@ pptx_server <- function(id) {
                   shiny::icon("arrow-up"),
                   class = "btn-sm btn-outline-secondary",
                   style = "margin-left: 5px;",
-                  disabled = global_idx == 1
+                  disabled = global_idx == 1,
+                  title = "Move image up in order"
                 ),
                 shiny::actionButton(
                   ns(paste0("move_down_", global_idx)),
                   shiny::icon("arrow-down"),
                   class = "btn-sm btn-outline-secondary",
                   style = "margin-left: 5px;",
-                  disabled = global_idx == total_files
+                  disabled = global_idx == total_files,
+                  title = "Move image down in order"
                 )
               )
             }
@@ -564,7 +570,8 @@ pptx_server <- function(id) {
               shiny::actionButton(
                 ns(paste0("merge_slide_", slide_idx)),
                 htmltools::tagList(shiny::icon("compress-alt"), " Merge with next"),
-                class = "btn-sm btn-outline-secondary"
+                class = "btn-sm btn-outline-secondary",
+                title = "Merge this slide with the next slide"
               )
             )
           }
@@ -812,11 +819,7 @@ pptx_server <- function(id) {
       output$show_files <- shiny::renderUI({
         htmltools::tagList(
           htmltools::tags$h6(
-            "These files reflect the current state of your local repository.",
-            htmltools::tags$br(),
-            htmltools::tags$br(),
-             "Please commit and push any changes or new files to GitHub to
-             ensure the links are up to date."
+            "These files reflect the current state of your local repository."
           ),
           htmltools::tags$ul(
             lapply(selected_items(), function(file) {
