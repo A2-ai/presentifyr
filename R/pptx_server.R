@@ -56,6 +56,16 @@ pptx_server <- function(id) {
         rv$report_filename <- trimws(input$pptx_filename)
       })
 
+      ## Separate renderUI for submit button so fileInput doesn't re-render
+      output$submit_template_btn <- shiny::renderUI({
+        file_ready <- !is.null(input$uploaded_template)
+        shiny::actionButton(
+          ns("submit_template"),
+          "Submit Template",
+          disabled = !file_ready
+        )
+      })
+
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 2. UI for file input, template confirmation, layout selection
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -68,7 +78,7 @@ pptx_server <- function(id) {
             "Choose a PPTX Template for Adding Images:",
             accept = ".pptx"
           ),
-          shiny::actionButton(ns("submit_template"), "Submit Template")
+          shiny::uiOutput(ns("submit_template_btn"))
         )
 
         template_label <- NULL
@@ -135,10 +145,15 @@ pptx_server <- function(id) {
           }
 
           htmltools::tags$div(
-            style = "flex: 0 0 auto; margin: 10px; text-align: center;",
-            htmltools::tags$img(src = image_path, width = "150px"),
-            htmltools::tags$p(paste("Layout:", layout_name), ph_badge),
-            shiny::actionButton(ns(paste0("btn_layout_", layout_name)), paste("Select", layout_name))
+            style = "flex: 0 0 auto; margin: 10px;",
+            htmltools::tags$img(src = image_path, width = "150px", style = "display: block; margin-bottom: 5px;"),
+            htmltools::tags$div(
+              style = "margin: 0 0 5px 0; font-size: 0.9em; max-width: 150px;",
+              htmltools::tags$div("Layout:"),
+              htmltools::tags$div(style = "font-weight: bold;", layout_name),
+              ph_badge
+            ),
+            shiny::actionButton(ns(paste0("btn_layout_", layout_name)), "Select", style = "width: 150px;")
           )
         })
 
