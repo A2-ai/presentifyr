@@ -8,6 +8,9 @@
 #' @param slide_groups A list of character vectors, where each vector contains file paths
 #'   for images to be placed on a single slide. If provided, \code{files} is ignored.
 #'   Images are placed in placeholders in order (top-left to bottom-right).
+#' @param slide_positions A list of integer vectors parallel to slide_groups, indicating
+#'   which placeholder (1-indexed) each image should be placed in. If NULL, images are
+#'   placed in placeholders sequentially (1, 2, 3...).
 #'
 #' @keywords internal
 #'
@@ -20,7 +23,7 @@
 #' }
 add_images <- function(files, output_pptx,
                        slide_layout_name = NULL, base_pptx = NULL,
-                       slide_groups = NULL) {
+                       slide_groups = NULL, slide_positions = NULL) {
 
   log4r::debug(.le$logger, "Starting add_images function")
 
@@ -77,8 +80,13 @@ add_images <- function(files, output_pptx,
   if (is.null(slide_groups)) {
     ## Backward compatibility: one image per slide
     slide_groups <- as.list(files)
+    slide_positions <- lapply(slide_groups, function(x) seq_along(x))
     log4r::debug(.le$logger, "Using single-image mode (one image per slide)")
   } else {
+    ## If positions not provided, default to sequential
+    if (is.null(slide_positions)) {
+      slide_positions <- lapply(slide_groups, function(x) seq_along(x))
+    }
     log4r::debug(.le$logger, paste("Using grouped mode:", length(slide_groups), "slides"))
   }
 
@@ -86,6 +94,7 @@ add_images <- function(files, output_pptx,
 
   for (slide_idx in seq_along(slide_groups)) {
     slide_files <- slide_groups[[slide_idx]]
+    slide_pos <- slide_positions[[slide_idx]]
     if (!is.character(slide_files)) slide_files <- as.character(slide_files)
 
     log4r::debug(.le$logger, paste("Creating slide", slide_idx, "of", length(slide_groups),
@@ -112,8 +121,10 @@ add_images <- function(files, output_pptx,
     for (img_idx in seq_along(slide_files)) {
       file <- slide_files[img_idx]
 
-      ## Get placeholder for this image (cycle if more images than placeholders)
-      ph_row_idx <- ((img_idx - 1) %% nrow(usable_placeholders_df)) + 1
+      ## Get placeholder for this image based on specified position
+      target_pos <- slide_pos[img_idx]
+      ## Clamp to valid range
+      ph_row_idx <- min(max(target_pos, 1), nrow(usable_placeholders_df))
       ph_info <- usable_placeholders_df[ph_row_idx, ]
 
       ph_left   <- ph_info$offx

@@ -21,7 +21,9 @@ pptx_server <- function(id) {
         processed_file = NULL,
         report_filename = NULL,
         slide_groups = NULL,        ## List of vectors for multi-image slides
-        pending_files = NULL        ## Files pending for preview
+        slide_positions = NULL,     ## List of integer vectors - which placeholder each image goes to
+        pending_files = NULL,       ## Files pending for preview
+        placeholder_count = 1L      ## Number of placeholders in selected layout
       )
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -381,20 +383,27 @@ pptx_server <- function(id) {
             placeholder_count <- layout_row$placeholder_count[1]
           }
         }
+        rv$placeholder_count <- placeholder_count
 
         ## Create initial slide groups (auto-distribute)
         n_files <- length(files)
         n_slides <- ceiling(n_files / placeholder_count)
 
         slide_groups <- vector("list", n_slides)
+        slide_positions <- vector("list", n_slides)
         for (i in seq_along(files)) {
           slide_idx <- ceiling(i / placeholder_count)
           if (is.null(slide_groups[[slide_idx]])) {
             slide_groups[[slide_idx]] <- character(0)
+            slide_positions[[slide_idx]] <- integer(0)
           }
           slide_groups[[slide_idx]] <- c(slide_groups[[slide_idx]], files[i])
+          ## Default position: 1, 2, 3... in order
+          pos_in_slide <- length(slide_groups[[slide_idx]])
+          slide_positions[[slide_idx]] <- c(slide_positions[[slide_idx]], pos_in_slide)
         }
         rv$slide_groups <- slide_groups
+        rv$slide_positions <- slide_positions
 
         log4r::debug(.le$logger, paste("Preview:", n_files, "files,", placeholder_count, "placeholders,", n_slides, "slides"))
 
@@ -425,16 +434,49 @@ pptx_server <- function(id) {
       }
 
       output$preview_slides_ui <- shiny::renderUI({
-        shiny::req(rv$slide_groups)
+        shiny::req(rv$slide_groups, rv$slide_positions)
+
+        total_files <- length(rv$pending_files)
+        ph_count <- rv$placeholder_count
 
         slide_divs <- lapply(seq_along(rv$slide_groups), function(slide_idx) {
           slide_files <- rv$slide_groups[[slide_idx]]
+          slide_pos <- rv$slide_positions[[slide_idx]]
+          n_images <- length(slide_files)
+
+          ## Show position selector if fewer images than placeholders
+          show_position_selector <- n_images < ph_count && ph_count > 1
 
           file_items <- lapply(seq_along(slide_files), function(file_idx) {
             file <- slide_files[file_idx]
-            ## Calculate global index across all slides (lengths() is safer for empty lists)
+            current_pos <- slide_pos[file_idx]
+
+            ## Calculate global index across all slides
             prior_count <- if (slide_idx == 1) 0L else sum(lengths(rv$slide_groups[seq_len(slide_idx - 1)]))
             global_idx <- prior_count + file_idx
+
+            ## Determine if this is the last image in this slide (for split button)
+            is_last_in_slide <- file_idx == length(slide_files)
+            ## Don't show split on very last image overall
+            show_split <- !is_last_in_slide || (is_last_in_slide && global_idx < total_files)
+
+            ## Position selector buttons (only if room to choose)
+            position_btns <- NULL
+            if (show_position_selector) {
+              position_btns <- htmltools::tags$span(
+                style = "margin-left: 10px; margin-right: 5px;",
+                htmltools::tags$span("Slot:", style = "font-size: 0.85em; color: #666; margin-right: 3px;"),
+                lapply(seq_len(ph_count), function(p) {
+                  btn_class <- if (p == current_pos) "btn-sm btn-primary" else "btn-sm btn-outline-secondary"
+                  shiny::actionButton(
+                    ns(paste0("pos_", slide_idx, "_", file_idx, "_", p)),
+                    as.character(p),
+                    class = btn_class,
+                    style = "padding: 2px 8px; margin: 0 1px;"
+                  )
+                })
+              )
+            }
 
             htmltools::tags$div(
               style = "display: flex; align-items: center; padding: 5px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;",
@@ -442,6 +484,7 @@ pptx_server <- function(id) {
                 style = "flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;",
                 basename(file)
               ),
+              position_btns,
               shiny::actionButton(
                 ns(paste0("move_up_", global_idx)),
                 shiny::icon("arrow-up"),
@@ -454,15 +497,38 @@ pptx_server <- function(id) {
                 shiny::icon("arrow-down"),
                 class = "btn-sm btn-outline-secondary",
                 style = "margin-left: 5px;",
-                disabled = global_idx == length(rv$pending_files)
-              )
+                disabled = global_idx == total_files
+              ),
+              if (show_split) {
+                shiny::actionButton(
+                  ns(paste0("split_after_", global_idx)),
+                  shiny::icon("level-down-alt"),
+                  class = "btn-sm btn-outline-primary",
+                  style = "margin-left: 5px;",
+                  title = "Start new slide after this image"
+                )
+              }
             )
           })
+
+          ## Add merge button if this isn't the last slide
+          merge_btn <- NULL
+          if (slide_idx < length(rv$slide_groups)) {
+            merge_btn <- htmltools::tags$div(
+              style = "text-align: right; margin-top: 5px;",
+              shiny::actionButton(
+                ns(paste0("merge_slide_", slide_idx)),
+                htmltools::tagList(shiny::icon("compress-alt"), " Merge with next"),
+                class = "btn-sm btn-outline-secondary"
+              )
+            )
+          }
 
           htmltools::tags$div(
             style = "border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px;",
             htmltools::tags$h5(paste("Slide", slide_idx), style = "margin-top: 0;"),
-            do.call(htmltools::tagList, file_items)
+            do.call(htmltools::tagList, file_items),
+            merge_btn
           )
         })
 
@@ -492,20 +558,145 @@ pptx_server <- function(id) {
                 rv$slide_groups <- regroup_files(files, rv$slide_groups)
               }
             }, ignoreInit = TRUE)
+
+            ## Split: create new slide after this image
+            shiny::observeEvent(input[[paste0("split_after_", idx)]], {
+              files <- unlist(rv$slide_groups)
+              if (idx < length(files)) {
+                ## Find which slide this index is in and split it
+                rv$slide_groups <- split_at_index(rv$slide_groups, idx)
+              }
+            }, ignoreInit = TRUE)
           })
         }
       })
 
-      ## Helper to regroup files maintaining slide sizes
+      ## Observers for merge buttons
+      shiny::observe({
+        shiny::req(rv$slide_groups)
+
+        for (s in seq_along(rv$slide_groups)) {
+          local({
+            slide_idx <- s
+
+            shiny::observeEvent(input[[paste0("merge_slide_", slide_idx)]], {
+              if (slide_idx < length(rv$slide_groups)) {
+                result <- merge_slides(rv$slide_groups, rv$slide_positions, slide_idx)
+                rv$slide_groups <- result$groups
+                rv$slide_positions <- result$positions
+              }
+            }, ignoreInit = TRUE)
+          })
+        }
+      })
+
+      ## Observers for position selector buttons
+      shiny::observe({
+        shiny::req(rv$slide_groups, rv$slide_positions)
+
+        for (s in seq_along(rv$slide_groups)) {
+          for (f in seq_along(rv$slide_groups[[s]])) {
+            for (p in seq_len(rv$placeholder_count)) {
+              local({
+                slide_idx <- s
+                file_idx <- f
+                pos <- p
+
+                shiny::observeEvent(input[[paste0("pos_", slide_idx, "_", file_idx, "_", pos)]], {
+                  rv$slide_positions[[slide_idx]][file_idx] <- pos
+                }, ignoreInit = TRUE)
+              })
+            }
+          }
+        }
+      })
+
+      ## Helper to regroup files maintaining slide sizes (also resets positions)
       regroup_files <- function(files, current_groups) {
-        sizes <- sapply(current_groups, length)
+        sizes <- lengths(current_groups)
         new_groups <- vector("list", length(sizes))
+        new_positions <- vector("list", length(sizes))
         file_idx <- 1
         for (i in seq_along(sizes)) {
           new_groups[[i]] <- files[file_idx:(file_idx + sizes[i] - 1)]
+          ## Reset positions to 1, 2, 3... when reordering
+          new_positions[[i]] <- seq_len(sizes[i])
           file_idx <- file_idx + sizes[i]
         }
+        rv$slide_positions <- new_positions
         new_groups
+      }
+
+      ## Helper to split slides at a global file index
+      split_at_index <- function(groups, global_idx) {
+        files <- unlist(groups)
+        positions <- unlist(rv$slide_positions)
+        cumulative <- cumsum(lengths(groups))
+
+        ## Find which slide contains this index
+        slide_idx <- which(cumulative >= global_idx)[1]
+        prior <- if (slide_idx == 1) 0 else cumulative[slide_idx - 1]
+        local_idx <- global_idx - prior
+
+        ## Split the slide
+        slide_files <- groups[[slide_idx]]
+        before_files <- slide_files[seq_len(local_idx)]
+        after_files <- slide_files[(local_idx + 1):length(slide_files)]
+
+        ## Rebuild groups
+        new_groups <- list()
+        new_positions <- list()
+
+        if (slide_idx > 1) {
+          new_groups <- groups[seq_len(slide_idx - 1)]
+          new_positions <- rv$slide_positions[seq_len(slide_idx - 1)]
+        }
+
+        new_groups <- c(new_groups, list(before_files))
+        ## Reset positions for split slides to default (1, 2, ...)
+        new_positions <- c(new_positions, list(seq_len(length(before_files))))
+
+        if (length(after_files) > 0) {
+          new_groups <- c(new_groups, list(after_files))
+          new_positions <- c(new_positions, list(seq_len(length(after_files))))
+        }
+
+        if (slide_idx < length(groups)) {
+          new_groups <- c(new_groups, groups[(slide_idx + 1):length(groups)])
+          new_positions <- c(new_positions, rv$slide_positions[(slide_idx + 1):length(groups)])
+        }
+
+        rv$slide_positions <- new_positions
+        new_groups
+      }
+
+      ## Helper to merge slide with next
+      merge_slides <- function(groups, positions, slide_idx) {
+        if (slide_idx >= length(groups)) {
+          return(list(groups = groups, positions = positions))
+        }
+
+        merged_files <- c(groups[[slide_idx]], groups[[slide_idx + 1]])
+        ## Reassign positions sequentially when merging
+        merged_positions <- seq_len(length(merged_files))
+
+        new_groups <- list()
+        new_positions <- list()
+
+        if (slide_idx > 1) {
+          new_groups <- groups[seq_len(slide_idx - 1)]
+          new_positions <- positions[seq_len(slide_idx - 1)]
+        }
+
+        new_groups <- c(new_groups, list(merged_files))
+        new_positions <- c(new_positions, list(merged_positions))
+
+        if (slide_idx + 1 < length(groups)) {
+          new_groups <- c(new_groups, groups[(slide_idx + 2):length(groups)])
+          new_positions <- c(new_positions, positions[(slide_idx + 2):length(groups)])
+        }
+
+        list(groups = new_groups, positions = new_positions)
       }
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -542,7 +733,8 @@ pptx_server <- function(id) {
               output_pptx = temp_pptx,
               slide_layout_name = chosen_layout,
               base_pptx = base_pptx,
-              slide_groups = rv$slide_groups    ## Pass groupings for multi-image
+              slide_groups = rv$slide_groups,   ## Pass groupings for multi-image
+              slide_positions = rv$slide_positions  ## Pass position preferences
             )
 
             file.copy(temp_pptx, file)
