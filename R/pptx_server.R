@@ -135,7 +135,7 @@ pptx_server <- function(id) {
           }
 
           htmltools::tags$div(
-            style = "display:inline-block; margin: 10px; text-align:center;",
+            style = "flex: 0 0 auto; margin: 10px; text-align: center;",
             htmltools::tags$img(src = image_path, width = "150px"),
             htmltools::tags$p(paste("Layout:", layout_name), ph_badge),
             shiny::actionButton(ns(paste0("btn_layout_", layout_name)), paste("Select", layout_name))
@@ -143,9 +143,12 @@ pptx_server <- function(id) {
         })
 
         htmltools::tags$div(
-          style = "margin-top:10px;",
+          style = "margin-top: 10px;",
           htmltools::tags$h4("Select a Layout"),
-          do.call(htmltools::tagList, layout_divs)
+          htmltools::tags$div(
+            style = "display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: flex-start;",
+            do.call(htmltools::tagList, layout_divs)
+          )
         )
       }
 
@@ -504,7 +507,7 @@ pptx_server <- function(id) {
             }
 
             htmltools::tags$div(
-              style = "display: flex; align-items: center; padding: 5px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;",
+              style = "display: flex; align-items: center; justify-content: flex-start; padding: 5px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;",
               htmltools::tags$span(
                 style = "flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;",
                 basename(file)
@@ -537,14 +540,17 @@ pptx_server <- function(id) {
           }
 
           htmltools::tags$div(
-            style = "border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px;",
+            style = "border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px; text-align: left;",
             htmltools::tags$h5(paste("Slide", slide_idx), style = "margin-top: 0;"),
             do.call(htmltools::tagList, file_items),
             merge_btn
           )
         })
 
-        do.call(htmltools::tagList, slide_divs)
+        htmltools::tags$div(
+          style = "text-align: left;",
+          do.call(htmltools::tagList, slide_divs)
+        )
       })
 
       ## Observers for move up/down buttons
