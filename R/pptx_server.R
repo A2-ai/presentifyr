@@ -38,10 +38,15 @@ pptx_server <- function(id) {
         shiny::showModal(
           shiny::modalDialog(
             title = "Customize PPTX Configuration",
-            ## Reduce spacing below modal title
+            size = "m",
+            ## Modal styling
             htmltools::tags$style("
+              .modal-dialog { width: fit-content; min-width: 300px; max-width: 90vw; }
+              .modal-content { width: fit-content; }
               .modal-header { padding-bottom: 10px; margin-bottom: 0; }
-              .modal-body { padding-top: 10px; }
+              .modal-title { font-size: 1.25rem; }
+              .modal-body { padding-top: 10px; padding-bottom: 10px; width: fit-content; }
+              .modal-footer { justify-content: center; padding-top: 10px; }
             "),
             textInput(
               ns("pptx_filename"),
@@ -176,7 +181,7 @@ pptx_server <- function(id) {
           style = "margin-top: 10px;",
           htmltools::tags$h4("Select a Layout"),
           htmltools::tags$div(
-            style = "display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: flex-start;",
+            style = "display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: flex-start; max-width: 360px;",
             do.call(htmltools::tagList, layout_divs)
           )
         )
@@ -815,7 +820,7 @@ pptx_server <- function(id) {
             "These files reflect the current state of your local repository.",
             htmltools::tags$br(),
             htmltools::tags$br(),
-             "Please commit and push any changes or new files to GitHub to
+            "Please commit and push any changes or new files to GitHub to
              ensure the links are up to date."
           ),
           htmltools::tags$ul(
