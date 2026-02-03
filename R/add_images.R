@@ -51,12 +51,19 @@ add_images <- function(files, output_pptx,
 
   placeholders <- officer::layout_properties(ppt, selected_layout)
 
-  content_placeholder <- placeholders$ph_label[grepl("Content Placeholder 2", placeholders$ph_label)]
+  ## Match Content Placeholder or Picture Placeholder labels
+  usable_placeholders <- placeholders$ph_label[
+    grepl("Content Placeholder|Picture Placeholder", placeholders$ph_label)
+  ]
 
-  if (length(content_placeholder) == 0) {
-    log4r::error(.le$logger, paste("No content placeholder found"))
-    stop("No content placeholder found")
+  if (length(usable_placeholders) == 0) {
+    log4r::error(.le$logger, paste("No usable placeholder found (Content or Picture)"))
+    stop("No usable placeholder found (Content Placeholder or Picture Placeholder)")
   }
+
+  ## Use the first matching placeholder
+  content_placeholder <- usable_placeholders[1]
+  log4r::debug(.le$logger, paste("Using placeholder:", content_placeholder))
 
   ## Extract bounding box (x=left, y=top, cx=width, cy=height in inches)
   ph_info <- placeholders[placeholders$ph_label == content_placeholder, ]
