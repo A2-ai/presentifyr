@@ -21,12 +21,13 @@ def compute_blob_hash(blob):
     return hashlib.md5(blob).hexdigest()
 
 
+def compute_text_hash(text):
+    """Compute MD5 hash of text content."""
+    return hashlib.md5(text.encode('utf-8')).hexdigest()
+
+
 def should_replace_image(shape, new_image_path, logger):
     """Determine if image should be replaced based on hash comparison."""
-    # Group shapes (type 14) don't expose image.blob - always replace
-    if shape.shape_type == 14:
-        return True, "group shape (hash comparison not supported)"
-
     try:
         existing_hash = compute_blob_hash(shape.image.blob)
         new_hash = compute_file_hash(new_image_path)
@@ -38,6 +39,27 @@ def should_replace_image(shape, new_image_path, logger):
     except Exception as e:
         logger.warning(f"Could not compute hash: {e}. Will replace image.")
         return True, f"hash computation failed ({e})"
+
+
+def should_update_notes(slide, new_notes_text, logger):
+    """Determine if slide notes should be updated based on hash comparison."""
+    try:
+        notes_slide = slide.notes_slide
+        text_frame = notes_slide.notes_text_frame
+        if text_frame is None:
+            return True, "no existing notes"
+
+        existing_text = text_frame.text or ""
+        existing_hash = compute_text_hash(existing_text)
+        new_hash = compute_text_hash(new_notes_text)
+
+        if existing_hash == new_hash:
+            return False, "unchanged (hashes match)"
+        else:
+            return True, "content changed"
+    except Exception as e:
+        logger.warning(f"Could not compare notes: {e}. Will update.")
+        return True, f"comparison failed ({e})"
 
 
 def load_metadata_for_image(image_path):
@@ -136,22 +158,30 @@ def sync_images(input_pptx, output_pptx, image_dict):
     magic_pattern = re.compile(start_pattern + '.*?' + end_pattern)
 
     # Track statistics for summary
-    stats = {'images_replaced': 0, 'images_skipped': 0, 'images_not_found': 0}
+    stats = {
+        'images_replaced': 0,
+        'images_skipped': 0,
+        'images_not_found': 0,
+        'notes_updated': 0,
+        'notes_skipped': 0
+    }
 
-    logger.info("Scanning slides for image replacements")
+    logger.info("Scanning slides for image and footnote sync")
 
-    for slide_index, slide in enumerate(presentation.slides, start=1):  
-        match_found = False 
-        replacements = [] ## Track replacements
+    for slide_index, slide in enumerate(presentation.slides, start=1):
+        matched_images = []  # All images with {prfy}: marker and valid paths
+        replacements = []    # Images that need replacement (hash differs)
 
         for shape in slide.shapes:
-            if shape.shape_type == 14:
+
+            # Extract alt_text based on shape type
+            if shape.shape_type == 14:  # GROUP
                 alt_text = shape._element._nvXxPr.cNvPr.attrib.get("descr", "")
-            elif shape.shape_type == 13: 
+            elif shape.shape_type == 13:  # PICTURE
                 alt_text = shape._element.nvPicPr.cNvPr.attrib.get("descr", "")
             else:
-                continue  
-            
+                continue
+
             logger.debug(f"Slide {slide_index}: Checking image alt-text: {alt_text}")
 
             match = magic_pattern.match(alt_text)
@@ -167,20 +197,23 @@ def sync_images(input_pptx, output_pptx, image_dict):
                             break
 
                 if image_path and os.path.exists(image_path):
+                    # Track all matched images for footnote processing
+                    matched_images.append((shape, image_path, alt_text))
+
                     # Check if image content has changed using hash comparison
                     should_replace, reason = should_replace_image(shape, image_path, logger)
 
                     if should_replace:
                         logger.info(f"Slide {slide_index}: Queuing replacement for {figure_name} ({reason})")
                         replacements.append((shape, image_path, alt_text))
-                        match_found = True
                     else:
-                        logger.debug(f"Slide {slide_index}: Skipping {figure_name} - {reason}")
+                        logger.debug(f"Slide {slide_index}: Skipping figure {figure_name} - {reason}")
                         stats['images_skipped'] += 1
                 else:
                     logger.warning(f"Slide {slide_index}: No matching image found for {figure_name} or file does not exist")
                     stats['images_not_found'] += 1
 
+        # Process figure replacements
         for shape, image_path, alt_text in replacements:
             left = shape.left
             top = shape.top
@@ -191,14 +224,14 @@ def sync_images(input_pptx, output_pptx, image_dict):
             new_pic = slide.shapes.add_picture(image_path, left, top, width, height)
             new_pic._element.nvPicPr.cNvPr.set("descr", alt_text)
 
-            logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path} with original dimensions and cropping maintained")
+            logger.debug(f"Slide {slide_index}: Replaced image from {image_path}")
             stats['images_replaced'] += 1
 
-        # Update slide notes if replacements were made
-        if replacements:
-            # Collect metadata from all replaced images on this slide
+        # Process footnotes independently (using ALL matched images, not just replacements)
+        if matched_images:
+            # Collect metadata from all matched images on this slide
             slide_metadata_list = {}
-            for _, image_path, _ in replacements:
+            for _, image_path, _ in matched_images:
                 metadata = load_metadata_for_image(image_path)
                 if metadata:
                     slide_metadata_list[os.path.basename(image_path)] = metadata
@@ -209,25 +242,33 @@ def sync_images(input_pptx, output_pptx, image_dict):
                     f"## {name}\n{format_slide_notes(meta)}"
                     for name, meta in slide_metadata_list.items()
                 )
-                logger.debug(f"Slide {slide_index}: Formatted combined notes from {len(slide_metadata_list)} image(s)")
 
-                # Set slide notes
-                try:
-                    notes_slide = slide.notes_slide
-                    text_frame = notes_slide.notes_text_frame
-                    if text_frame is not None:
-                        text_frame.text = combined_notes
-                        logger.debug(f"Slide {slide_index}: Updated slide notes")
-                    else:
-                        logger.warning(f"Slide {slide_index}: No notes text frame available")
-                except Exception as e:
-                    logger.warning(f"Slide {slide_index}: Could not update notes - {e}")
+                # Check if notes content has changed using hash comparison
+                should_update, reason = should_update_notes(slide, combined_notes, logger)
 
-        if not match_found:
-            logger.warning(f"Slide {slide_index}: No matching alt-text for replacement")
+                if should_update:
+                    try:
+                        notes_slide = slide.notes_slide
+                        text_frame = notes_slide.notes_text_frame
+                        if text_frame is not None:
+                            text_frame.text = combined_notes
+                            logger.info(f"Slide {slide_index}: Updated notes ({reason})")
+                            stats['notes_updated'] += 1
+                        else:
+                            logger.warning(f"Slide {slide_index}: No notes text frame available")
+                    except Exception as e:
+                        logger.warning(f"Slide {slide_index}: Could not update notes - {e}")
+                else:
+                    logger.debug(f"Slide {slide_index}: Skipping notes - {reason}")
+                    stats['notes_skipped'] += 1
 
-    logger.info(f"Sync complete: {stats['images_replaced']} replaced, "
-                f"{stats['images_skipped']} unchanged")
+        if not matched_images:
+            logger.warning(f"Slide {slide_index}: No matching alt-text found")
+
+    logger.info(f"Sync complete: {stats['images_replaced']} images replaced, "
+                f"{stats['images_skipped']} images unchanged, "
+                f"{stats['notes_updated']} notes updated, "
+                f"{stats['notes_skipped']} notes unchanged")
 
     presentation.save(output_pptx)
     logger.debug(f"PowerPoint saved as {output_pptx}")
