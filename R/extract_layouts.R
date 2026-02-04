@@ -69,13 +69,32 @@ extract_layouts <- function(base_pptx,
 
   layout_names <- sub("\\.png$", "", basename(layout_images))  # Extract names without extension
 
+  ## Read layout metadata JSON
+  metadata_path <- file.path(output_dir, "layout_metadata.json")
+  placeholder_counts <- rep(NA_integer_, length(layout_names))
+
+  if (file.exists(metadata_path)) {
+    metadata <- jsonlite::fromJSON(metadata_path)
+    for (i in seq_along(layout_names)) {
+      layout_key <- layout_names[i]
+      if (!is.null(metadata[[layout_key]])) {
+        placeholder_counts[i] <- metadata[[layout_key]]$placeholder_count
+      }
+    }
+    log4r::debug(.le$logger, "Loaded layout metadata from JSON")
+  } else {
+    log4r::warn(.le$logger, "Layout metadata JSON not found")
+  }
+
   sorted_order <- order(layout_names)
   layout_names <- layout_names[sorted_order]
   layout_images <- layout_images[sorted_order]
+  placeholder_counts <- placeholder_counts[sorted_order]
 
   out_df <- data.frame(
     layout_name = layout_names,
     image_path = layout_images,
+    placeholder_count = placeholder_counts,
     stringsAsFactors = FALSE
   )
 

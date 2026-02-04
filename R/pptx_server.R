@@ -19,7 +19,13 @@ pptx_server <- function(id) {
         extracted_layouts = NULL,
         uploaded_file = NULL,
         processed_file = NULL,
-        report_filename = NULL
+        report_filename = NULL,
+        slide_groups = NULL,        ## List of vectors for multi-image slides
+        slide_positions = NULL,     ## List of integer vectors - which placeholder each image goes to
+        pending_files = NULL,       ## Files pending for preview
+        placeholder_count = 1L,     ## Number of placeholders in selected layout
+        img_dirs = NULL,            ## Directories for image resource paths
+        file_input_key = 0L         ## Counter to force fileInput re-render on clear
       )
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -34,15 +40,17 @@ pptx_server <- function(id) {
         shiny::showModal(
           shiny::modalDialog(
             title = "Customize PPTX Configuration",
+            ## Reduce spacing below modal title
+            htmltools::tags$style("
+              .modal-header { padding-bottom: 10px; margin-bottom: 0; }
+              .modal-body { padding-top: 10px; }
+            "),
             textInput(
               ns("pptx_filename"),
               label       = "PowerPoint File Name (Extension Not Required):",
               placeholder = "presentation"
             ),
             shiny::uiOutput(ns("configs_options")),
-            htmltools::hr(),
-            htmltools::tags$p("Please use the following to clear a provided PPTX template:"),
-            shiny::actionButton(ns("clear_template"), "Clear Template"),
             footer = shiny::modalButton("Close")
           )
         )
@@ -52,19 +60,46 @@ pptx_server <- function(id) {
         rv$report_filename <- trimws(input$pptx_filename)
       })
 
+      ## Separate renderUI for submit/clear buttons so fileInput doesn't re-render
+      output$submit_template_btn <- shiny::renderUI({
+        file_input_id <- paste0("uploaded_template_", rv$file_input_key)
+        file_ready <- !is.null(input[[file_input_id]])
+        template_loaded <- !is.null(rv$uploaded_template)
+        htmltools::tags$div(
+          class = "shiny-input-container",
+          style = "display: flex; gap: 10px;",
+          shiny::actionButton(
+            ns("submit_template"),
+            "Submit Template",
+            disabled = !file_ready,
+            style = "flex: 1;"
+          ),
+          shiny::actionButton(
+            ns("clear_template"),
+            "Clear Template",
+            class = "btn-outline-secondary",
+            disabled = !template_loaded,
+            style = "flex: 1;"
+          )
+        )
+      })
+
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 2. UI for file input, template confirmation, layout selection
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$configs_options <- shiny::renderUI({
         log4r::info(.le$logger, "Rendering UI for PPTX configuration & layout selection")
 
+        ## Force fileInput re-render when key changes (e.g., after clearing template)
+        file_key <- rv$file_input_key
+
         file_upload_area <- shiny::tagList(
           shiny::fileInput(
-            ns("uploaded_template"),
+            ns(paste0("uploaded_template_", file_key)),
             "Choose a PPTX Template for Adding Images:",
             accept = ".pptx"
           ),
-          shiny::actionButton(ns("submit_template"), "Submit Template")
+          shiny::uiOutput(ns("submit_template_btn"))
         )
 
         template_label <- NULL
@@ -118,19 +153,38 @@ pptx_server <- function(id) {
         layout_divs <- lapply(seq_len(nrow(rv$extracted_layouts)), function(i) {
           layout_name <- rv$extracted_layouts$layout_name[i]
           image_path <- rv$extracted_layouts$image_path[i]
+          placeholder_count <- rv$extracted_layouts$placeholder_count[i]
+
+          ## Build placeholder count badge
+          ph_badge <- if (!is.na(placeholder_count)) {
+            htmltools::tags$span(
+              style = "background: #e45600; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.85em;",
+              paste(placeholder_count, "slot(s)")
+            )
+          } else {
+            NULL
+          }
 
           htmltools::tags$div(
-            style = "display:inline-block; margin: 10px; text-align:center;",
-            htmltools::tags$img(src = image_path, width = "150px"),
-            htmltools::tags$p(paste("Layout:", layout_name)),
-            shiny::actionButton(ns(paste0("btn_layout_", layout_name)), paste("Select", layout_name))
+            style = "flex: 0 0 auto; margin: 10px;",
+            htmltools::tags$img(src = image_path, width = "150px", style = "display: block; margin-bottom: 5px;"),
+            htmltools::tags$div(
+              style = "margin: 0 0 5px 0; font-size: 0.9em; max-width: 150px;",
+              htmltools::tags$div("Layout:"),
+              htmltools::tags$div(style = "font-weight: bold;", layout_name),
+              ph_badge
+            ),
+            shiny::actionButton(ns(paste0("btn_layout_", layout_name)), "Select", style = "width: 150px;")
           )
         })
 
         htmltools::tags$div(
-          style = "margin-top:10px;",
+          style = "margin-top: 10px;",
           htmltools::tags$h4("Select a Layout"),
-          do.call(htmltools::tagList, layout_divs)
+          htmltools::tags$div(
+            style = "display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: flex-start;",
+            do.call(htmltools::tagList, layout_divs)
+          )
         )
       }
 
@@ -138,7 +192,8 @@ pptx_server <- function(id) {
       # 3. Submit template - extract layouts
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$submit_template, {
-        rv$uploaded_template <- input$uploaded_template
+        file_input_id <- paste0("uploaded_template_", rv$file_input_key)
+        rv$uploaded_template <- input[[file_input_id]]
 
         if (is.null(rv$uploaded_template)) {
           log4r::error(.le$logger, "No template PPTX file was uploaded")
@@ -228,6 +283,7 @@ pptx_server <- function(id) {
         rv$uploaded_template <- NULL
         rv$extracted_layouts <- NULL
         rv$selected_layout_name <- NULL
+        rv$file_input_key <- rv$file_input_key + 1L  ## Force fileInput to re-render with new ID
 
         shiny::removeModal()
 
@@ -345,10 +401,486 @@ pptx_server <- function(id) {
         if (length(selected_items()) == 0) {
           shiny::actionButton(ns("no_files"), "No files selected", style = "pointer-events: none;")
         } else {
-          shiny::downloadButton(ns("download"), "Download pptx")
+          shiny::actionButton(ns("preview_slides"), "Preview & Download")
         }
       })
 
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      # 7a. Preview modal for slide arrangement
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      shiny::observeEvent(input$preview_slides, {
+        log4r::info(.le$logger, "Opening slide preview modal")
+
+        selected <- selected_items()
+        ## selected_items() returns list of lists with 'path' element - extract and make absolute
+        files <- vapply(selected, function(item) {
+          f <- if (is.list(item)) item$path else item
+          if (startsWith(f, "/") || grepl("^[A-Za-z]:", f)) {
+            f
+          } else {
+            file.path(getwd(), f)
+          }
+        }, character(1), USE.NAMES = FALSE)
+        rv$pending_files <- files
+
+        ## Set up resource path for image thumbnails
+        img_dirs <- unique(dirname(files))
+        for (i in seq_along(img_dirs)) {
+          path_name <- paste0("preview_imgs_", i)
+          if (!(path_name %in% names(shiny::resourcePaths()))) {
+            shiny::addResourcePath(path_name, img_dirs[i])
+          }
+        }
+        rv$img_dirs <- img_dirs  ## Store for use in renderUI
+
+        ## Determine placeholder count from selected layout
+        placeholder_count <- 1L
+        if (!is.null(rv$extracted_layouts) && !is.null(rv$selected_layout_name)) {
+          ## Convert selected layout name to safe name for lookup
+          safe_name <- gsub("[^\\w\\-_]", "_", rv$selected_layout_name, perl = TRUE)
+          layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == safe_name, ]
+          if (nrow(layout_row) > 0 && !is.na(layout_row$placeholder_count[1])) {
+            placeholder_count <- layout_row$placeholder_count[1]
+          }
+        }
+        rv$placeholder_count <- placeholder_count
+
+        ## Create initial slide groups (auto-distribute)
+        n_files <- length(files)
+        n_slides <- ceiling(n_files / placeholder_count)
+
+        slide_groups <- vector("list", n_slides)
+        slide_positions <- vector("list", n_slides)
+        for (i in seq_along(files)) {
+          slide_idx <- ceiling(i / placeholder_count)
+          if (is.null(slide_groups[[slide_idx]])) {
+            slide_groups[[slide_idx]] <- character(0)
+            slide_positions[[slide_idx]] <- integer(0)
+          }
+          slide_groups[[slide_idx]] <- c(slide_groups[[slide_idx]], files[i])
+          ## Default position: 1, 2, 3... in order
+          pos_in_slide <- length(slide_groups[[slide_idx]])
+          slide_positions[[slide_idx]] <- c(slide_positions[[slide_idx]], pos_in_slide)
+        }
+        rv$slide_groups <- slide_groups
+        rv$slide_positions <- slide_positions
+
+        log4r::debug(.le$logger, paste("Preview:", n_files, "files,", placeholder_count, "placeholders,", n_slides, "slides"))
+
+        showPreviewModal(placeholder_count)
+      })
+
+      showPreviewModal <- function(placeholder_count) {
+        shiny::showModal(
+          shiny::modalDialog(
+            title = "Preview Slide Arrangement",
+            size = "l",
+            ## Styles for image thumbnails and lightbox
+            htmltools::tags$style(htmltools::HTML("
+              .preview-thumbnail {
+                width: 60px;
+                height: 45px;
+                object-fit: cover;
+                border-radius: 4px;
+                margin-right: 10px;
+                border: 1px solid #ddd;
+                cursor: pointer;
+                transition: transform 0.15s, box-shadow 0.15s;
+              }
+              .preview-thumbnail:hover {
+                transform: scale(1.1);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+              }
+              /* Lightbox overlay */
+              .img-lightbox {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.85);
+                z-index: 10000;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+              }
+              .img-lightbox.active {
+                display: flex;
+              }
+              .img-lightbox img {
+                max-width: 90%;
+                max-height: 90%;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+              }
+              .img-lightbox .close-hint {
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                color: white;
+                font-size: 1.2em;
+              }
+            ")),
+            ## Lightbox container (will be populated by JS)
+            htmltools::tags$div(
+              id = "img-lightbox",
+              class = "img-lightbox",
+              onclick = "this.classList.remove('active');",
+              htmltools::tags$span(class = "close-hint", "Click anywhere to close"),
+              htmltools::tags$img(id = "lightbox-img", src = "", alt = "Preview")
+            ),
+            ## JavaScript to handle thumbnail clicks
+            htmltools::tags$script(htmltools::HTML("
+              $(document).on('click', '.preview-thumbnail', function() {
+                var src = $(this).attr('src');
+                $('#lightbox-img').attr('src', src);
+                $('#img-lightbox').addClass('active');
+              });
+            ")),
+            htmltools::tags$p(
+              paste0("Layout has ", placeholder_count, " placeholder(s) per slide. ",
+                     "Images will be distributed across ", length(rv$slide_groups), " slide(s).")
+            ),
+            htmltools::tags$p(
+              style = "color: #666; font-size: 0.9em;",
+              "Use the arrows to reorder images. Images are grouped into slides based on their order."
+            ),
+            htmltools::hr(),
+            shiny::uiOutput(ns("preview_slides_ui")),
+            footer = htmltools::tagList(
+              htmltools::tags$span(
+                title = "Generate and download the PowerPoint file",
+                shiny::downloadButton(ns("download"), "Generate PPTX")
+              ),
+              shiny::modalButton("Cancel")
+            )
+          )
+        )
+      }
+
+      ## Helper to get web-accessible path for an image file
+      get_image_web_path <- function(file_path) {
+        dir_path <- dirname(file_path)
+        dir_idx <- which(rv$img_dirs == dir_path)[1]
+        if (!is.na(dir_idx)) {
+          paste0("preview_imgs_", dir_idx, "/", basename(file_path))
+        } else {
+          ## Fallback - shouldn't happen if paths are set up correctly
+          log4r::warn(.le$logger, paste("Could not find resource path for:", file_path))
+          ""
+        }
+      }
+
+      output$preview_slides_ui <- shiny::renderUI({
+        shiny::req(rv$slide_groups, rv$slide_positions)
+
+        total_files <- length(rv$pending_files)
+        ph_count <- rv$placeholder_count
+
+        slide_divs <- lapply(seq_along(rv$slide_groups), function(slide_idx) {
+          slide_files <- rv$slide_groups[[slide_idx]]
+          slide_pos <- rv$slide_positions[[slide_idx]]
+          n_images <- length(slide_files)
+
+          ## Show position selector if fewer images than placeholders
+          slide_has_room <- n_images < ph_count
+          show_position_selector <- slide_has_room && ph_count > 1
+
+          ## Hide up/down arrows when slide has room (use slot selector instead)
+          show_reorder_arrows <- !slide_has_room
+
+          file_items <- lapply(seq_along(slide_files), function(file_idx) {
+            file <- slide_files[file_idx]
+            current_pos <- slide_pos[file_idx]
+
+            ## Calculate global index across all slides
+            prior_count <- if (slide_idx == 1) 0L else sum(lengths(rv$slide_groups[seq_len(slide_idx - 1)]))
+            global_idx <- prior_count + file_idx
+
+            ## Show split button on all images except the first in each slide
+            ## "Split before" semantics: this image and everything after moves to new slide
+            show_split <- file_idx > 1
+
+            ## Position selector buttons (only if room to choose)
+            position_btns <- NULL
+            if (show_position_selector) {
+              position_btns <- htmltools::tags$span(
+                style = "margin-left: 10px; margin-right: 5px;",
+                htmltools::tags$span("Slot:", style = "font-size: 0.85em; color: #666; margin-right: 3px;"),
+                lapply(seq_len(ph_count), function(p) {
+                  btn_class <- if (p == current_pos) "btn-sm btn-primary" else "btn-sm btn-outline-secondary"
+                  shiny::actionButton(
+                    ns(paste0("pos_", slide_idx, "_", file_idx, "_", p)),
+                    as.character(p),
+                    class = btn_class,
+                    style = "padding: 2px 8px; margin: 0 1px;",
+                    title = paste("Place image in slot", p)
+                  )
+                })
+              )
+            }
+
+            ## Reorder arrows (only for full slides, hide when not usable)
+            reorder_btns <- NULL
+            if (show_reorder_arrows) {
+              up_btn <- if (global_idx > 1) {
+                shiny::actionButton(
+                  ns(paste0("move_up_", global_idx)),
+                  shiny::icon("arrow-up"),
+                  class = "btn-sm btn-outline-secondary",
+                  style = "margin-left: 5px;",
+                  title = "Move image up in order"
+                )
+              }
+              down_btn <- if (global_idx < total_files) {
+                shiny::actionButton(
+                  ns(paste0("move_down_", global_idx)),
+                  shiny::icon("arrow-down"),
+                  class = "btn-sm btn-outline-secondary",
+                  style = "margin-left: 5px;",
+                  title = "Move image down in order"
+                )
+              }
+              reorder_btns <- htmltools::tagList(up_btn, down_btn)
+            }
+
+            ## Get web path for thumbnail
+            web_path <- get_image_web_path(file)
+
+            htmltools::tags$div(
+              style = "display: flex; align-items: center; justify-content: flex-start; padding: 5px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;",
+              ## Image thumbnail
+              htmltools::tags$img(
+                src = web_path,
+                alt = basename(file),
+                class = "preview-thumbnail"
+              ),
+              htmltools::tags$span(
+                style = "flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;",
+                basename(file)
+              ),
+              position_btns,
+              reorder_btns,
+              if (show_split) {
+                shiny::actionButton(
+                  ns(paste0("split_before_", global_idx)),
+                  shiny::icon("level-down-alt"),
+                  class = "btn-sm btn-outline-primary",
+                  style = "margin-left: 5px;",
+                  title = "Move this image to a new slide"
+                )
+              }
+            )
+          })
+
+          ## Add merge button only if this slide has room AND isn't the last slide
+          merge_btn <- NULL
+          if (slide_has_room && slide_idx < length(rv$slide_groups)) {
+            merge_btn <- htmltools::tags$div(
+              style = "text-align: right; margin-top: 5px;",
+              shiny::actionButton(
+                ns(paste0("merge_slide_", slide_idx)),
+                htmltools::tagList(shiny::icon("compress-alt"), " Merge with next"),
+                class = "btn-sm btn-outline-secondary",
+                title = "Merge this slide with the next slide"
+              )
+            )
+          }
+
+          htmltools::tags$div(
+            style = "border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px; text-align: left;",
+            htmltools::tags$h5(paste("Slide", slide_idx), style = "margin-top: 0;"),
+            do.call(htmltools::tagList, file_items),
+            merge_btn
+          )
+        })
+
+        htmltools::tags$div(
+          style = "text-align: left;",
+          do.call(htmltools::tagList, slide_divs)
+        )
+      })
+
+      ## Track created observers to prevent duplicates
+      .created_obs <- new.env(parent = emptyenv())
+      .created_obs$move <- integer(0)
+      .created_obs$merge <- integer(0)
+      .created_obs$pos <- character(0)
+
+      ## Observers for move up/down buttons
+      shiny::observe({
+        shiny::req(rv$pending_files)
+
+        for (i in seq_along(rv$pending_files)) {
+          if (!(i %in% .created_obs$move)) {
+            local({
+              idx <- i
+
+              shiny::observeEvent(input[[paste0("move_up_", idx)]], {
+                if (idx > 1) {
+                  files <- unlist(rv$slide_groups)
+                  files[c(idx - 1, idx)] <- files[c(idx, idx - 1)]
+                  rv$slide_groups <- regroup_files(files, rv$slide_groups)
+                }
+              }, ignoreInit = TRUE)
+
+              shiny::observeEvent(input[[paste0("move_down_", idx)]], {
+                files <- unlist(rv$slide_groups)
+                if (idx < length(files)) {
+                  files[c(idx, idx + 1)] <- files[c(idx + 1, idx)]
+                  rv$slide_groups <- regroup_files(files, rv$slide_groups)
+                }
+              }, ignoreInit = TRUE)
+
+              ## Split before: this image and everything after moves to new slide
+              shiny::observeEvent(input[[paste0("split_before_", idx)]], {
+                ## Find which slide this index is in and split it
+                rv$slide_groups <- split_before_index(rv$slide_groups, idx)
+              }, ignoreInit = TRUE)
+            })
+            .created_obs$move <- c(.created_obs$move, i)
+          }
+        }
+      })
+
+      ## Observers for merge buttons
+      shiny::observe({
+        shiny::req(rv$slide_groups)
+
+        for (s in seq_along(rv$slide_groups)) {
+          if (!(s %in% .created_obs$merge)) {
+            local({
+              slide_idx <- s
+
+              shiny::observeEvent(input[[paste0("merge_slide_", slide_idx)]], {
+                if (slide_idx < length(rv$slide_groups)) {
+                  result <- merge_slides(rv$slide_groups, rv$slide_positions, slide_idx)
+                  rv$slide_groups <- result$groups
+                  rv$slide_positions <- result$positions
+                }
+              }, ignoreInit = TRUE)
+            })
+            .created_obs$merge <- c(.created_obs$merge, s)
+          }
+        }
+      })
+
+      ## Observers for position selector buttons
+      shiny::observe({
+        shiny::req(rv$slide_groups, rv$slide_positions)
+
+        for (s in seq_along(rv$slide_groups)) {
+          for (f in seq_along(rv$slide_groups[[s]])) {
+            for (p in seq_len(rv$placeholder_count)) {
+              obs_key <- paste0(s, "_", f, "_", p)
+              if (!(obs_key %in% .created_obs$pos)) {
+                local({
+                  slide_idx <- s
+                  file_idx <- f
+                  pos <- p
+
+                  shiny::observeEvent(input[[paste0("pos_", slide_idx, "_", file_idx, "_", pos)]], {
+                    rv$slide_positions[[slide_idx]][file_idx] <- pos
+                  }, ignoreInit = TRUE)
+                })
+                .created_obs$pos <- c(.created_obs$pos, obs_key)
+              }
+            }
+          }
+        }
+      })
+
+      ## Helper to regroup files maintaining slide sizes (also resets positions)
+      regroup_files <- function(files, current_groups) {
+        sizes <- lengths(current_groups)
+        new_groups <- vector("list", length(sizes))
+        new_positions <- vector("list", length(sizes))
+        file_idx <- 1
+        for (i in seq_along(sizes)) {
+          new_groups[[i]] <- files[file_idx:(file_idx + sizes[i] - 1)]
+          ## Reset positions to 1, 2, 3... when reordering
+          new_positions[[i]] <- seq_len(sizes[i])
+          file_idx <- file_idx + sizes[i]
+        }
+        rv$slide_positions <- new_positions
+        new_groups
+      }
+
+      ## Helper to split slides BEFORE a global file index
+      ## "Split before" semantics: this image and everything after moves to new slide
+      split_before_index <- function(groups, global_idx) {
+        cumulative <- cumsum(lengths(groups))
+
+        ## Find which slide contains this index
+        slide_idx <- which(cumulative >= global_idx)[1]
+        prior <- if (slide_idx == 1) 0 else cumulative[slide_idx - 1]
+        local_idx <- global_idx - prior
+
+        ## Split the slide: before gets images 1 to local_idx-1, after gets local_idx to end
+        slide_files <- groups[[slide_idx]]
+        before_files <- slide_files[seq_len(local_idx - 1)]
+        after_files <- slide_files[local_idx:length(slide_files)]
+
+        ## Rebuild groups
+        new_groups <- list()
+        new_positions <- list()
+
+        if (slide_idx > 1) {
+          new_groups <- groups[seq_len(slide_idx - 1)]
+          new_positions <- rv$slide_positions[seq_len(slide_idx - 1)]
+        }
+
+        ## Add before_files (will have at least 1 image since button only shows for file_idx > 1)
+        new_groups <- c(new_groups, list(before_files))
+        new_positions <- c(new_positions, list(seq_len(length(before_files))))
+
+        ## Add after_files (this image and any following in the same slide)
+        new_groups <- c(new_groups, list(after_files))
+        new_positions <- c(new_positions, list(seq_len(length(after_files))))
+
+        ## Add remaining slides
+        if (slide_idx < length(groups)) {
+          new_groups <- c(new_groups, groups[(slide_idx + 1):length(groups)])
+          new_positions <- c(new_positions, rv$slide_positions[(slide_idx + 1):length(groups)])
+        }
+
+        rv$slide_positions <- new_positions
+        new_groups
+      }
+
+      ## Helper to merge slide with next
+      merge_slides <- function(groups, positions, slide_idx) {
+        if (slide_idx >= length(groups)) {
+          return(list(groups = groups, positions = positions))
+        }
+
+        merged_files <- c(groups[[slide_idx]], groups[[slide_idx + 1]])
+        ## Reassign positions sequentially when merging
+        merged_positions <- seq_len(length(merged_files))
+
+        new_groups <- list()
+        new_positions <- list()
+
+        if (slide_idx > 1) {
+          new_groups <- groups[seq_len(slide_idx - 1)]
+          new_positions <- positions[seq_len(slide_idx - 1)]
+        }
+
+        new_groups <- c(new_groups, list(merged_files))
+        new_positions <- c(new_positions, list(merged_positions))
+
+        if (slide_idx + 1 < length(groups)) {
+          new_groups <- c(new_groups, groups[(slide_idx + 2):length(groups)])
+          new_positions <- c(new_positions, positions[(slide_idx + 2):length(groups)])
+        }
+
+        list(groups = new_groups, positions = new_positions)
+      }
+
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      # 7b. Download handler (now triggered from preview modal)
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$download <- shiny::downloadHandler(
         filename = function() {
           base <- rv$report_filename
@@ -364,6 +896,7 @@ pptx_server <- function(id) {
         content = function(file) {
           temp_pptx <- tempfile(fileext = ".pptx")
 
+          shiny::removeModal()
           shiny::showModal(shiny::modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
           log4r::info(.le$logger, "Starting PowerPoint creation process")
 
@@ -375,10 +908,12 @@ pptx_server <- function(id) {
             start_time <- Sys.time()
 
             add_images(
-              files = selected_items(),
+              files = unlist(rv$slide_groups),  ## Flatten for backward compat if needed
               output_pptx = temp_pptx,
               slide_layout_name = chosen_layout,
-              base_pptx = base_pptx
+              base_pptx = base_pptx,
+              slide_groups = rv$slide_groups,   ## Pass groupings for multi-image
+              slide_positions = rv$slide_positions  ## Pass position preferences
             )
 
             file.copy(temp_pptx, file)
@@ -408,11 +943,7 @@ pptx_server <- function(id) {
       output$show_files <- shiny::renderUI({
         htmltools::tagList(
           htmltools::tags$h6(
-            "These files reflect the current state of your local repository.",
-            htmltools::tags$br(),
-            htmltools::tags$br(),
-             "Please commit and push any changes or new files to GitHub to
-             ensure the links are up to date."
+            "These files reflect the current state of your local repository."
           ),
           htmltools::tags$ul(
             lapply(selected_items(), function(file) {
@@ -440,7 +971,15 @@ pptx_server <- function(id) {
         if ("pptx_layouts" %in% names(shiny::resourcePaths())) {
           shiny::removeResourcePath("pptx_layouts")
         }
-        log4r::info(.le$logger, "Session ended, removed resource path 'pptx_layouts'")
+
+        ## Clean up preview image resource paths
+        resource_paths <- names(shiny::resourcePaths())
+        preview_paths <- resource_paths[grepl("^preview_imgs_", resource_paths)]
+        for (path_name in preview_paths) {
+          shiny::removeResourcePath(path_name)
+        }
+
+        log4r::info(.le$logger, "Session ended, removed resource paths")
       })
     }
   )
