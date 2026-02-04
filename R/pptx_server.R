@@ -941,7 +941,44 @@ pptx_server <- function(id) {
       )
 
       output$show_files <- shiny::renderUI({
+        template_info <- NULL
+        if (!is.null(rv$uploaded_template)) {
+          template_name <- basename(rv$uploaded_template$name)
+
+          layout_display <- NULL
+          if (!is.null(rv$selected_layout_name) && !is.null(rv$extracted_layouts)) {
+            ## Find the selected layout row to get the image path
+            layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == rv$selected_layout_name, ]
+            if (nrow(layout_row) > 0) {
+              image_path <- layout_row$image_path[1]
+              layout_display <- htmltools::tags$div(
+                style = "margin-top: 10px;",
+                htmltools::tags$img(
+                  src = image_path,
+                  width = "150px",
+                  style = "display: block; margin-bottom: 5px; border: 1px solid #ccc;"
+                ),
+                htmltools::tags$div(
+                  style = "font-size: 0.9em; max-width: 150px;",
+                  htmltools::tags$div("Layout:"),
+                  htmltools::tags$div(style = "font-weight: bold;", rv$selected_layout_name)
+                )
+              )
+            }
+          }
+
+          template_info <- htmltools::tags$div(
+            htmltools::tags$p(
+              style = "font-weight:bold; color:#e45600; margin-bottom:5px;",
+              paste0("Template: ", template_name)
+            ),
+            layout_display,
+            htmltools::tags$hr()
+          )
+        }
+
         htmltools::tagList(
+          template_info,
           htmltools::tags$h6(
             "These files reflect the current state of your local repository."
           ),
