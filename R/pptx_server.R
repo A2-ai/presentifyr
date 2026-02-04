@@ -24,7 +24,8 @@ pptx_server <- function(id) {
         slide_positions = NULL,     ## List of integer vectors - which placeholder each image goes to
         pending_files = NULL,       ## Files pending for preview
         placeholder_count = 1L,     ## Number of placeholders in selected layout
-        img_dirs = NULL             ## Directories for image resource paths
+        img_dirs = NULL,            ## Directories for image resource paths
+        file_input_key = 0L         ## Counter to force fileInput re-render on clear
       )
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,7 +62,8 @@ pptx_server <- function(id) {
 
       ## Separate renderUI for submit/clear buttons so fileInput doesn't re-render
       output$submit_template_btn <- shiny::renderUI({
-        file_ready <- !is.null(input$uploaded_template)
+        file_input_id <- paste0("uploaded_template_", rv$file_input_key)
+        file_ready <- !is.null(input[[file_input_id]])
         template_loaded <- !is.null(rv$uploaded_template)
         htmltools::tags$div(
           class = "shiny-input-container",
@@ -88,9 +90,12 @@ pptx_server <- function(id) {
       output$configs_options <- shiny::renderUI({
         log4r::info(.le$logger, "Rendering UI for PPTX configuration & layout selection")
 
+        ## Force fileInput re-render when key changes (e.g., after clearing template)
+        file_key <- rv$file_input_key
+
         file_upload_area <- shiny::tagList(
           shiny::fileInput(
-            ns("uploaded_template"),
+            ns(paste0("uploaded_template_", file_key)),
             "Choose a PPTX Template for Adding Images:",
             accept = ".pptx"
           ),
@@ -187,7 +192,8 @@ pptx_server <- function(id) {
       # 3. Submit template - extract layouts
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$submit_template, {
-        rv$uploaded_template <- input$uploaded_template
+        file_input_id <- paste0("uploaded_template_", rv$file_input_key)
+        rv$uploaded_template <- input[[file_input_id]]
 
         if (is.null(rv$uploaded_template)) {
           log4r::error(.le$logger, "No template PPTX file was uploaded")
@@ -277,6 +283,7 @@ pptx_server <- function(id) {
         rv$uploaded_template <- NULL
         rv$extracted_layouts <- NULL
         rv$selected_layout_name <- NULL
+        rv$file_input_key <- rv$file_input_key + 1L  ## Force fileInput to re-render with new ID
 
         shiny::removeModal()
 
