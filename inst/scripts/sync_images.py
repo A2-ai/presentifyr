@@ -2,8 +2,42 @@ import os
 import re
 import argparse
 import json
+import hashlib
 from pptx import Presentation
 from py_logger import get_logger
+
+
+def compute_file_hash(file_path):
+    """Compute MD5 hash of a file on disk."""
+    hash_md5 = hashlib.md5()
+    with open(file_path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def compute_blob_hash(blob):
+    """Compute MD5 hash of binary data (image blob from PPTX)."""
+    return hashlib.md5(blob).hexdigest()
+
+
+def should_replace_image(shape, new_image_path, logger):
+    """Determine if image should be replaced based on hash comparison."""
+    # Group shapes (type 14) don't expose image.blob - always replace
+    if shape.shape_type == 14:
+        return True, "group shape (hash comparison not supported)"
+
+    try:
+        existing_hash = compute_blob_hash(shape.image.blob)
+        new_hash = compute_file_hash(new_image_path)
+
+        if existing_hash == new_hash:
+            return False, "unchanged (hashes match)"
+        else:
+            return True, "content changed"
+    except Exception as e:
+        logger.warning(f"Could not compute hash: {e}. Will replace image.")
+        return True, f"hash computation failed ({e})"
 
 
 def load_metadata_for_image(image_path):
@@ -93,13 +127,16 @@ def format_slide_notes(metadata):
 def sync_images(input_pptx, output_pptx, image_dict):
     logger = get_logger()
     logger.debug(f"Starting sync images Python function")
-    
+
     presentation = Presentation(input_pptx)
     logger.debug(f"Using input .pptx file: {input_pptx}")
 
     start_pattern = r'\{prfy\}\:'
     end_pattern = r'\.[^.]+$'
     magic_pattern = re.compile(start_pattern + '.*?' + end_pattern)
+
+    # Track statistics for summary
+    stats = {'images_replaced': 0, 'images_skipped': 0, 'images_not_found': 0}
 
     logger.info("Scanning slides for image replacements")
 
@@ -130,11 +167,19 @@ def sync_images(input_pptx, output_pptx, image_dict):
                             break
 
                 if image_path and os.path.exists(image_path):
-                    logger.info(f"Slide {slide_index}: Queuing replacement for {figure_name} with {image_path}")
-                    replacements.append((shape, image_path, alt_text))
-                    match_found = True
+                    # Check if image content has changed using hash comparison
+                    should_replace, reason = should_replace_image(shape, image_path, logger)
+
+                    if should_replace:
+                        logger.info(f"Slide {slide_index}: Queuing replacement for {figure_name} ({reason})")
+                        replacements.append((shape, image_path, alt_text))
+                        match_found = True
+                    else:
+                        logger.debug(f"Slide {slide_index}: Skipping {figure_name} - {reason}")
+                        stats['images_skipped'] += 1
                 else:
                     logger.warning(f"Slide {slide_index}: No matching image found for {figure_name} or file does not exist")
+                    stats['images_not_found'] += 1
 
         for shape, image_path, alt_text in replacements:
             left = shape.left
@@ -147,24 +192,31 @@ def sync_images(input_pptx, output_pptx, image_dict):
             new_pic._element.nvPicPr.cNvPr.set("descr", alt_text)
 
             logger.debug(f"Slide {slide_index}: Inserted new picture from {image_path} with original dimensions and cropping maintained")
+            stats['images_replaced'] += 1
 
         # Update slide notes if replacements were made
         if replacements:
-            # Use the last replaced image for notes (typically one per slide)
-            _, last_image_path, _ = replacements[-1]
+            # Collect metadata from all replaced images on this slide
+            slide_metadata_list = {}
+            for _, image_path, _ in replacements:
+                metadata = load_metadata_for_image(image_path)
+                if metadata:
+                    slide_metadata_list[os.path.basename(image_path)] = metadata
 
-            # Load metadata and format notes
-            metadata = load_metadata_for_image(last_image_path)
-            if metadata:
-                notes_text = format_slide_notes(metadata)
-                logger.debug(f"Slide {slide_index}: Formatted notes with metadata")
+            if slide_metadata_list:
+                # Combine notes from all images (matching add_images.R behavior)
+                combined_notes = "\n\n".join(
+                    f"## {name}\n{format_slide_notes(meta)}"
+                    for name, meta in slide_metadata_list.items()
+                )
+                logger.debug(f"Slide {slide_index}: Formatted combined notes from {len(slide_metadata_list)} image(s)")
 
                 # Set slide notes
                 try:
                     notes_slide = slide.notes_slide
                     text_frame = notes_slide.notes_text_frame
                     if text_frame is not None:
-                        text_frame.text = notes_text
+                        text_frame.text = combined_notes
                         logger.debug(f"Slide {slide_index}: Updated slide notes")
                     else:
                         logger.warning(f"Slide {slide_index}: No notes text frame available")
@@ -173,6 +225,9 @@ def sync_images(input_pptx, output_pptx, image_dict):
 
         if not match_found:
             logger.warning(f"Slide {slide_index}: No matching alt-text for replacement")
+
+    logger.info(f"Sync complete: {stats['images_replaced']} replaced, "
+                f"{stats['images_skipped']} unchanged")
 
     presentation.save(output_pptx)
     logger.debug(f"PowerPoint saved as {output_pptx}")
