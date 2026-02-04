@@ -309,7 +309,8 @@ pptx_server <- function(id) {
         shiny::showModal(shiny::modalDialog(
           title = "Sync Images",
           htmltools::tags$p("Use this menu to sync your PowerPoint with a local repository."),
-          shiny::actionButton(ns("open_upload_sync"), "Upload File")
+          shiny::actionButton(ns("open_upload_sync"), "Upload File"),
+          footer = shiny::modalButton("Close")
         ))
       })
 
@@ -398,11 +399,13 @@ pptx_server <- function(id) {
 
       output$button <- shiny::renderUI({
         shiny::req(selected_items())
-        if (length(selected_items()) == 0) {
-          shiny::actionButton(ns("no_files"), "No files selected", style = "pointer-events: none;")
-        } else {
-          shiny::actionButton(ns("preview_slides"), "Preview & Download")
-        }
+        files_selected <- length(selected_items()) > 0
+        shiny::actionButton(
+          ns("preview_slides"),
+          if (files_selected) "Preview & Download" else "No files selected",
+          disabled = !files_selected,
+          width = "100%"
+        )
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
