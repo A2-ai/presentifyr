@@ -1,0 +1,50 @@
+.bslib-sidebar-layout {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+}
+
+.bslib-sidebar-layout > .sidebar {
+  width: 350px;
+  min-width: 250px;
+  max-width: 70vw;
+  transition: none !important;
+}
+
+.bslib-sidebar-layout > .main {
+  min-width: 0;
+  overflow: auto;
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 1000;
+  transition: background 0.2s;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.resizing {
+  background: rgba(228, 86, 0, 0.3);
+}
+
+.sidebar-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 30px;
+  background: #ccc;
+  border-radius: 1px;
+}
+
+.sidebar-resize-handle:hover::after,
+.sidebar-resize-handle.resizing::after {
+  background: #e45600;
+}

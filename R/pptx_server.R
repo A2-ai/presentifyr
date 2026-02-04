@@ -39,7 +39,7 @@ pptx_server <- function(id) {
       showConfigModal <- function() {
         shiny::showModal(
           shiny::modalDialog(
-            title = "Customize PPTX Configuration",
+            title = "Customize PowerPoint Configuration",
             ## Reduce spacing below modal title
             htmltools::tags$style("
               .modal-header { padding-bottom: 10px; margin-bottom: 0; }
@@ -96,7 +96,7 @@ pptx_server <- function(id) {
         file_upload_area <- shiny::tagList(
           shiny::fileInput(
             ns(paste0("uploaded_template_", file_key)),
-            "Choose a PPTX Template for Adding Images:",
+            "Choose a PowerPoint Template for Adding Images:",
             accept = ".pptx"
           ),
           shiny::uiOutput(ns("submit_template_btn"))
@@ -308,8 +308,9 @@ pptx_server <- function(id) {
         log4r::info(.le$logger, "Opening Sync Modal")
         shiny::showModal(shiny::modalDialog(
           title = "Sync Images",
-          htmltools::tags$p("Use this menu to sync your PPTX with a local repository."),
-          shiny::actionButton(ns("open_upload_sync"), "Upload File")
+          htmltools::tags$p("Use this menu to sync your PowerPoint with a local repository."),
+          shiny::actionButton(ns("open_upload_sync"), "Upload File"),
+          footer = shiny::modalButton("Close")
         ))
       })
 
@@ -317,8 +318,8 @@ pptx_server <- function(id) {
         log4r::info(.le$logger, "Opening Upload Modal for Sync Modal")
         shiny::removeModal()
         shiny::showModal(shiny::modalDialog(
-          title = "Upload PPTX for Syncing",
-          shiny::fileInput(ns("uploaded_sync_file"), "Choose a PPTX File for Syncing:", accept = ".pptx"),
+          title = "Upload PowerPoint for Syncing",
+          shiny::fileInput(ns("uploaded_sync_file"), "Choose a PowerPoint File for Syncing:", accept = ".pptx"),
           footer = htmltools::tagList(
             shiny::actionButton(ns("submit_sync_file"), "Submit Sync File"),
             shiny::modalButton("Close")
@@ -334,7 +335,7 @@ pptx_server <- function(id) {
           log4r::error(.le$logger, "No PPTX file uploaded for syncing")
           shiny::showModal(shiny::modalDialog(
             title = "Error",
-            "No PPTX file was uploaded for syncing. Please try again.",
+            "No PowerPoint file was uploaded for syncing. Please try again.",
             footer = shiny::modalButton("Close")
           ))
           return()
@@ -347,7 +348,7 @@ pptx_server <- function(id) {
 
         shiny::showModal(shiny::modalDialog(
           title = "Processing Sync",
-          "Your PPTX file is being synced. This may take a few moments.",
+          "Your PowerPoint file is being synced. This may take a few moments.",
           footer = NULL
         ))
 
@@ -360,7 +361,7 @@ pptx_server <- function(id) {
             title = "Success",
             "Images were successfully updated. Your updated presentation is ready for download.",
             footer = htmltools::tagList(
-              shiny::downloadButton(ns("download_synced_pptx"), "Download Updated PPTX"),
+              shiny::downloadButton(ns("download_synced_pptx"), "Download Updated PowerPoint"),
               shiny::modalButton("Close")
             )
           ))
@@ -398,11 +399,13 @@ pptx_server <- function(id) {
 
       output$button <- shiny::renderUI({
         shiny::req(selected_items())
-        if (length(selected_items()) == 0) {
-          shiny::actionButton(ns("no_files"), "No files selected", style = "pointer-events: none;")
-        } else {
-          shiny::actionButton(ns("preview_slides"), "Preview & Download")
-        }
+        files_selected <- length(selected_items()) > 0
+        shiny::actionButton(
+          ns("preview_slides"),
+          if (files_selected) "Preview & Download" else "No files selected",
+          disabled = !files_selected,
+          width = "100%"
+        )
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -540,7 +543,7 @@ pptx_server <- function(id) {
             ")),
             htmltools::tags$p(
               paste0("Layout has ", placeholder_count, " placeholder(s) per slide. ",
-                     "Images will be distributed across ", length(rv$slide_groups), " slide(s).")
+                     "Initially, images will be distributed across ", length(rv$slide_groups), " slide(s).")
             ),
             htmltools::tags$p(
               style = "color: #666; font-size: 0.9em;",
@@ -551,7 +554,7 @@ pptx_server <- function(id) {
             footer = htmltools::tagList(
               htmltools::tags$span(
                 title = "Generate and download the PowerPoint file",
-                shiny::downloadButton(ns("download"), "Generate PPTX")
+                shiny::downloadButton(ns("download"), "Generate PowerPoint")
               ),
               shiny::modalButton("Cancel")
             )
@@ -941,7 +944,44 @@ pptx_server <- function(id) {
       )
 
       output$show_files <- shiny::renderUI({
+        template_info <- NULL
+        if (!is.null(rv$uploaded_template)) {
+          template_name <- basename(rv$uploaded_template$name)
+
+          layout_display <- NULL
+          if (!is.null(rv$selected_layout_name) && !is.null(rv$extracted_layouts)) {
+            ## Find the selected layout row to get the image path
+            layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == rv$selected_layout_name, ]
+            if (nrow(layout_row) > 0) {
+              image_path <- layout_row$image_path[1]
+              layout_display <- htmltools::tags$div(
+                style = "margin-top: 10px;",
+                htmltools::tags$img(
+                  src = image_path,
+                  width = "150px",
+                  style = "display: block; margin-bottom: 5px; border: 1px solid #ccc;"
+                ),
+                htmltools::tags$div(
+                  style = "font-size: 0.9em; max-width: 150px;",
+                  htmltools::tags$div("Layout:"),
+                  htmltools::tags$div(style = "font-weight: bold;", rv$selected_layout_name)
+                )
+              )
+            }
+          }
+
+          template_info <- htmltools::tags$div(
+            htmltools::tags$p(
+              style = "font-weight:bold; color:#e45600; margin-bottom:5px;",
+              paste0("Template: ", template_name)
+            ),
+            layout_display,
+            htmltools::tags$hr()
+          )
+        }
+
         htmltools::tagList(
+          template_info,
           htmltools::tags$h6(
             "These files reflect the current state of your local repository."
           ),

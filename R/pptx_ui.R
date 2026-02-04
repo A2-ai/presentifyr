@@ -4,9 +4,12 @@ pptx_ui <- function(id) {
   ns <- shiny::NS(id)
 
   bslib::page_sidebar(
+    htmltools::tags$head(
+      htmltools::tags$link(rel = "stylesheet", type = "text/css", href = "presentifyr/resize-sidebar.css"),
+      htmltools::tags$script(src = "presentifyr/resize-sidebar.js")
+    ),
     theme = theme,
     sidebar = bslib::sidebar(
-      width = "35%",
 
       # Logo and title section (reduced vertical padding)
       htmltools::div(
