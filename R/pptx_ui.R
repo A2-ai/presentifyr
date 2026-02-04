@@ -6,6 +6,7 @@ pptx_ui <- function(id) {
   bslib::page_sidebar(
     htmltools::tags$head(
       htmltools::tags$link(rel = "stylesheet", type = "text/css", href = "presentifyr/resize-sidebar.css"),
+      htmltools::tags$link(rel = "stylesheet", type = "text/css", href = "presentifyr/modal-styles.css"),
       htmltools::tags$script(src = "presentifyr/resize-sidebar.js")
     ),
     theme = theme,
@@ -22,8 +23,14 @@ pptx_ui <- function(id) {
       htmltools::tags$hr(style = "margin-top: 0; margin-bottom: 10px;"),
 
       # Modal action buttons/options
-      shiny::actionButton(ns("configs"), label = htmltools::tagList(shiny::icon("cog"), "Configurations"), width = "100%"),
-      shiny::actionButton(ns("sync"), label = htmltools::tagList(shiny::icon("sync"), "Sync"), width = "100%"),
+      htmltools::tags$span(
+        title = "Configure output filename, template, and layout",
+        shiny::actionButton(ns("configs"), label = "Settings", width = "100%")
+      ),
+      htmltools::tags$span(
+        title = "Update images in an existing PowerPoint file",
+        shiny::actionButton(ns("sync"), label = "Sync PowerPoint", width = "100%")
+      ),
       shiny::uiOutput(ns("button")),
       treeNavigatorUI(ns("treeNavigator"))
     ),

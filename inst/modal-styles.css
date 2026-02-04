@@ -1,0 +1,569 @@
+/* Modern Modal Styling for presentifyr */
+
+/* ============================================
+   Modal Backdrop
+   ============================================ */
+.modal-backdrop {
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal-backdrop.show {
+  opacity: 1;
+}
+
+/* ============================================
+   Modal Container & Animation
+   ============================================ */
+.modal.fade .modal-dialog {
+  transform: scale(0.95) translateY(-20px);
+  opacity: 0;
+  transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+}
+
+.modal.show .modal-dialog {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+/* ============================================
+   Modal Content (the actual box)
+   ============================================ */
+.modal-content {
+  border: none;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 10px 15px -3px rgba(0, 0, 0, 0.15),
+    0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* ============================================
+   Modal Header
+   ============================================ */
+.modal-header {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 1.25rem 1.5rem;
+}
+
+.modal-title {
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: #1e293b;
+  letter-spacing: -0.01em;
+}
+
+/* Close button (X) */
+.modal-header .btn-close {
+  opacity: 0.5;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.modal-header .btn-close:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* ============================================
+   Modal Body
+   ============================================ */
+.modal-body {
+  padding: 1.5rem;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.modal-body p {
+  margin-bottom: 1rem;
+}
+
+.modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* Form controls within modals */
+.modal-body .form-control,
+.modal-body .form-select {
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  padding: 0.625rem 0.875rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.modal-body .form-control:focus,
+.modal-body .form-select:focus {
+  border-color: #e45600;
+  box-shadow: 0 0 0 3px rgba(228, 86, 0, 0.1);
+}
+
+/* Override browser autofill styling */
+.modal-body .form-control:-webkit-autofill,
+.modal-body .form-control:-webkit-autofill:hover,
+.modal-body .form-control:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: #374151 !important;
+}
+
+/* Ensure no blue highlight on valid inputs */
+.modal-body .form-control:valid {
+  border-color: #e2e8f0;
+  background-image: none;
+}
+
+.modal-body .form-control:valid:focus {
+  border-color: #e45600;
+}
+
+.modal-body .form-label,
+.modal-body .control-label {
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  font-size: 0.925rem;
+}
+
+/* File input styling */
+.modal-body .form-control[type="file"] {
+  padding: 0.5rem;
+}
+
+/* File upload progress bar */
+.modal-body .progress-bar,
+.modal-body .shiny-file-input-progress .progress-bar {
+  background-color: #1c63af !important;
+}
+
+.modal-body .form-control[type="file"]::file-selector-button {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  margin-right: 1rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-body .form-control[type="file"]::file-selector-button:hover {
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+  color: #1e293b;
+}
+
+/* ============================================
+   Modal Footer
+   ============================================ */
+.modal-footer {
+  background: #f8fafc;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 1rem 1.5rem;
+  gap: 0.75rem;
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+.modal .btn {
+  border-radius: 8px;
+  padding: 0.5rem 1.25rem;
+  font-weight: 500;
+  font-size: 0.925rem;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+/* Primary action buttons */
+.modal .btn-primary,
+.modal .btn-default {
+  background: linear-gradient(135deg, #e45600 0%, #d14d00 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(228, 86, 0, 0.25);
+}
+
+.modal .btn-primary:hover,
+.modal .btn-default:hover {
+  background: linear-gradient(135deg, #ff6b1a 0%, #e45600 100%);
+  box-shadow: 0 4px 8px rgba(228, 86, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+.modal .btn-primary:active,
+.modal .btn-default:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(228, 86, 0, 0.25);
+}
+
+/* Secondary/Cancel buttons */
+.modal .btn-secondary,
+.modal-footer .btn[data-bs-dismiss="modal"],
+.modal-footer .btn[data-dismiss="modal"] {
+  background: white;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.modal .btn-secondary:hover,
+.modal-footer .btn[data-bs-dismiss="modal"]:hover,
+.modal-footer .btn[data-dismiss="modal"]:hover {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+/* Download and sync buttons (blue) */
+.modal .btn-download,
+.modal .btn-sync,
+.modal .btn[id*="download"] {
+  background: linear-gradient(135deg, #1c63af 0%, #185091 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(28, 99, 175, 0.25);
+}
+
+.modal .btn-download:hover,
+.modal .btn-sync:hover,
+.modal .btn[id*="download"]:hover {
+  background: linear-gradient(135deg, #2574c9 0%, #1c63af 100%);
+  box-shadow: 0 4px 8px rgba(28, 99, 175, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Disabled buttons */
+.modal .btn:disabled,
+.modal .btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ============================================
+   Action buttons inside modal body
+   ============================================ */
+.modal-body .btn.action-button,
+.modal-body .btn-default {
+  background: linear-gradient(135deg, #e45600 0%, #d14d00 100%);
+  color: white;
+  border-radius: 8px;
+  padding: 0.625rem 1.25rem;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(228, 86, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.modal-body .btn.action-button:hover,
+.modal-body .btn-default:hover {
+  background: linear-gradient(135deg, #ff6b1a 0%, #e45600 100%);
+  box-shadow: 0 4px 8px rgba(228, 86, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Outline/secondary action buttons */
+.modal-body .btn-outline-secondary {
+  background: white;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.modal-body .btn-outline-secondary:hover {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+/* ============================================
+   Horizontal rules in modals
+   ============================================ */
+.modal-body hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+  margin: 1.25rem 0;
+}
+
+/* ============================================
+   Configuration modal form consistency
+   ============================================ */
+.modal-body .form-group.shiny-input-container {
+  min-width: 350px;
+  max-width: 450px;
+}
+
+/* Input with clear button */
+.input-with-clear {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-clear .shiny-input-container {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.input-with-clear .form-control {
+  padding-right: 35px;
+}
+
+.btn-clear-input {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%) !important;
+  background: none !important;
+  border: none !important;
+  color: #e45600 !important;
+  padding: 0.25rem 0.4rem !important;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  z-index: 10;
+  min-width: auto !important;
+  box-shadow: none !important;
+}
+
+.btn-clear-input:hover {
+  color: #d14d00 !important;
+  background: none !important;
+  transform: translateY(-50%) !important;
+}
+
+.btn-clear-input:focus {
+  outline: none;
+  box-shadow: none !important;
+}
+
+/* ============================================
+   Layout Carousel
+   ============================================ */
+.layout-carousel {
+  text-align: center;
+}
+
+.layout-carousel-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.layout-carousel-counter {
+  font-size: 0.9rem;
+  color: #64748b;
+  min-width: 50px;
+}
+
+.btn-carousel {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-carousel:hover:not(:disabled) {
+  background: #e2e8f0;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+.btn-carousel:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.layout-carousel-preview {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.layout-carousel-img {
+  max-width: 100%;
+  height: auto;
+  max-height: 200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+.layout-carousel-info {
+  text-align: center;
+}
+
+.layout-carousel-name {
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.layout-carousel-slots {
+  background: #e45600;
+  color: white;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  display: inline-block;
+}
+
+/* Blue button (Submit Template, Select Layout) */
+.btn-blue,
+.btn-select {
+  background: linear-gradient(135deg, #1c63af 0%, #185091 100%) !important;
+  color: white !important;
+  border: none !important;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(28, 99, 175, 0.25);
+}
+
+.btn-blue:hover,
+.btn-select:hover {
+  background: linear-gradient(135deg, #2574c9 0%, #1c63af 100%) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(28, 99, 175, 0.35);
+}
+
+.btn-blue:disabled,
+.btn-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn-selected {
+  background: linear-gradient(135deg, #1c63af 0%, #185091 100%) !important;
+  color: white !important;
+  border: none !important;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(28, 99, 175, 0.25);
+  cursor: default !important;
+  pointer-events: none;
+}
+
+.btn-selected:hover {
+  background: linear-gradient(135deg, #1c63af 0%, #185091 100%) !important;
+  transform: none !important;
+}
+
+/* ============================================
+   Preview modal slide organizer buttons
+   ============================================ */
+.modal-body .btn-sm.btn-outline-secondary,
+.modal-body .btn-sm.btn-outline-primary {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.modal-body .btn-sm.btn-outline-secondary .fa,
+.modal-body .btn-sm.btn-outline-primary .fa,
+.modal-body .btn-sm.btn-outline-secondary .fas,
+.modal-body .btn-sm.btn-outline-primary .fas {
+  font-size: 0.8rem;
+}
+
+/* New slide button (blue) */
+.modal-body .btn-sm.btn-new-slide {
+  background: linear-gradient(135deg, #1c63af 0%, #185091 100%);
+  color: white;
+  border: none;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  box-shadow: 0 1px 2px rgba(28, 99, 175, 0.2);
+}
+
+.modal-body .btn-sm.btn-new-slide:hover {
+  background: linear-gradient(135deg, #2574c9 0%, #1c63af 100%);
+  box-shadow: 0 2px 4px rgba(28, 99, 175, 0.3);
+}
+
+.modal-body .btn-sm.btn-new-slide .fa,
+.modal-body .btn-sm.btn-new-slide .fas {
+  font-size: 0.8rem;
+}
+
+/* ============================================
+   Larger modals (preview modal)
+   ============================================ */
+.modal-lg .modal-content,
+.modal-xl .modal-content {
+  border-radius: 16px;
+}
+
+.modal-lg .modal-header,
+.modal-xl .modal-header {
+  padding: 1.5rem 2rem;
+}
+
+.modal-lg .modal-body,
+.modal-xl .modal-body {
+  padding: 2rem;
+}
+
+.modal-lg .modal-footer,
+.modal-xl .modal-footer {
+  padding: 1.25rem 2rem;
+}
+
+/* ============================================
+   Scrollable modal body
+   ============================================ */
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ============================================
+   Responsive adjustments
+   ============================================ */
+@media (max-width: 576px) {
+  .modal-content {
+    border-radius: 12px 12px 0 0;
+    margin: 0;
+  }
+
+  .modal-dialog {
+    margin: auto 0 0 0;
+    max-width: 100%;
+  }
+
+  .modal.fade .modal-dialog {
+    transform: translateY(100%);
+  }
+
+  .modal.show .modal-dialog {
+    transform: translateY(0);
+  }
+}
