@@ -10,7 +10,6 @@ pptx_ui <- function(id) {
     ),
     theme = theme,
     sidebar = bslib::sidebar(
-      width = "400px",
 
       # Logo and title section (reduced vertical padding)
       htmltools::div(

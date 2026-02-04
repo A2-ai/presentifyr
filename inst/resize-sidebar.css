@@ -5,6 +5,7 @@
 }
 
 .bslib-sidebar-layout > .sidebar {
+  width: 450px;
   min-width: 250px;
   max-width: 70vw;
   transition: none !important;
