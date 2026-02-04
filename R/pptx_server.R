@@ -23,7 +23,8 @@ pptx_server <- function(id) {
         slide_groups = NULL,        ## List of vectors for multi-image slides
         slide_positions = NULL,     ## List of integer vectors - which placeholder each image goes to
         pending_files = NULL,       ## Files pending for preview
-        placeholder_count = 1L      ## Number of placeholders in selected layout
+        placeholder_count = 1L,     ## Number of placeholders in selected layout
+        img_dirs = NULL             ## Directories for image resource paths
       )
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -403,8 +404,27 @@ pptx_server <- function(id) {
       shiny::observeEvent(input$preview_slides, {
         log4r::info(.le$logger, "Opening slide preview modal")
 
-        files <- selected_items()
+        selected <- selected_items()
+        ## selected_items() returns list of lists with 'path' element - extract and make absolute
+        files <- vapply(selected, function(item) {
+          f <- if (is.list(item)) item$path else item
+          if (startsWith(f, "/") || grepl("^[A-Za-z]:", f)) {
+            f
+          } else {
+            file.path(getwd(), f)
+          }
+        }, character(1), USE.NAMES = FALSE)
         rv$pending_files <- files
+
+        ## Set up resource path for image thumbnails
+        img_dirs <- unique(dirname(files))
+        for (i in seq_along(img_dirs)) {
+          path_name <- paste0("preview_imgs_", i)
+          if (!(path_name %in% names(shiny::resourcePaths()))) {
+            shiny::addResourcePath(path_name, img_dirs[i])
+          }
+        }
+        rv$img_dirs <- img_dirs  ## Store for use in renderUI
 
         ## Determine placeholder count from selected layout
         placeholder_count <- 1L
@@ -448,6 +468,69 @@ pptx_server <- function(id) {
           shiny::modalDialog(
             title = "Preview Slide Arrangement",
             size = "l",
+            ## Styles for image thumbnails and lightbox
+            htmltools::tags$style(htmltools::HTML("
+              .preview-thumbnail {
+                width: 60px;
+                height: 45px;
+                object-fit: cover;
+                border-radius: 4px;
+                margin-right: 10px;
+                border: 1px solid #ddd;
+                cursor: pointer;
+                transition: transform 0.15s, box-shadow 0.15s;
+              }
+              .preview-thumbnail:hover {
+                transform: scale(1.1);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+              }
+              /* Lightbox overlay */
+              .img-lightbox {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.85);
+                z-index: 10000;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+              }
+              .img-lightbox.active {
+                display: flex;
+              }
+              .img-lightbox img {
+                max-width: 90%;
+                max-height: 90%;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+              }
+              .img-lightbox .close-hint {
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                color: white;
+                font-size: 1.2em;
+              }
+            ")),
+            ## Lightbox container (will be populated by JS)
+            htmltools::tags$div(
+              id = "img-lightbox",
+              class = "img-lightbox",
+              onclick = "this.classList.remove('active');",
+              htmltools::tags$span(class = "close-hint", "Click anywhere to close"),
+              htmltools::tags$img(id = "lightbox-img", src = "", alt = "Preview")
+            ),
+            ## JavaScript to handle thumbnail clicks
+            htmltools::tags$script(htmltools::HTML("
+              $(document).on('click', '.preview-thumbnail', function() {
+                var src = $(this).attr('src');
+                $('#lightbox-img').attr('src', src);
+                $('#img-lightbox').addClass('active');
+              });
+            ")),
             htmltools::tags$p(
               paste0("Layout has ", placeholder_count, " placeholder(s) per slide. ",
                      "Images will be distributed across ", length(rv$slide_groups), " slide(s).")
@@ -467,6 +550,19 @@ pptx_server <- function(id) {
             )
           )
         )
+      }
+
+      ## Helper to get web-accessible path for an image file
+      get_image_web_path <- function(file_path) {
+        dir_path <- dirname(file_path)
+        dir_idx <- which(rv$img_dirs == dir_path)[1]
+        if (!is.na(dir_idx)) {
+          paste0("preview_imgs_", dir_idx, "/", basename(file_path))
+        } else {
+          ## Fallback - shouldn't happen if paths are set up correctly
+          log4r::warn(.le$logger, paste("Could not find resource path for:", file_path))
+          ""
+        }
       }
 
       output$preview_slides_ui <- shiny::renderUI({
@@ -542,8 +638,17 @@ pptx_server <- function(id) {
               reorder_btns <- htmltools::tagList(up_btn, down_btn)
             }
 
+            ## Get web path for thumbnail
+            web_path <- get_image_web_path(file)
+
             htmltools::tags$div(
               style = "display: flex; align-items: center; justify-content: flex-start; padding: 5px; margin: 2px 0; background: #f5f5f5; border-radius: 4px;",
+              ## Image thumbnail
+              htmltools::tags$img(
+                src = web_path,
+                alt = basename(file),
+                class = "preview-thumbnail"
+              ),
               htmltools::tags$span(
                 style = "flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;",
                 basename(file)
@@ -859,7 +964,15 @@ pptx_server <- function(id) {
         if ("pptx_layouts" %in% names(shiny::resourcePaths())) {
           shiny::removeResourcePath("pptx_layouts")
         }
-        log4r::info(.le$logger, "Session ended, removed resource path 'pptx_layouts'")
+
+        ## Clean up preview image resource paths
+        resource_paths <- names(shiny::resourcePaths())
+        preview_paths <- resource_paths[grepl("^preview_imgs_", resource_paths)]
+        for (path_name in preview_paths) {
+          shiny::removeResourcePath(path_name)
+        }
+
+        log4r::info(.le$logger, "Session ended, removed resource paths")
       })
     }
   )
