@@ -693,7 +693,7 @@ pptx_server <- function(id) {
                 style = "margin-left: 10px; margin-right: 5px;",
                 htmltools::tags$span("Slot:", style = "font-size: 0.85em; color: #666; margin-right: 3px;"),
                 lapply(seq_len(ph_count), function(p) {
-                  btn_class <- if (p == current_pos) "btn-sm btn-primary" else "btn-sm btn-outline-secondary"
+                  btn_class <- if (p == current_pos) "btn-sm btn-primary" else "btn-sm btn-slot-unselected"
                   shiny::actionButton(
                     ns(paste0("pos_", slide_idx, "_", file_idx, "_", p)),
                     as.character(p),
