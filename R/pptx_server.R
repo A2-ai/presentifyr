@@ -1029,74 +1029,146 @@ pptx_server <- function(id) {
         ## Check if we have any PowerPoint details to show
         has_filename <- !is.null(rv$report_filename) && nzchar(rv$report_filename)
         has_template <- !is.null(rv$uploaded_template)
+        files <- selected_items()
+        has_files <- length(files) > 0
 
+        ## Empty state — nothing configured and no files selected
+        if (!has_filename && !has_template && !has_files) {
+          return(htmltools::tags$div(
+            class = "empty-state",
+            htmltools::tags$div(class = "empty-state-icon", shiny::icon("sliders")),
+            htmltools::tags$div(
+              class = "empty-state-text",
+              "Configure your presentation in Settings, then select images from the file tree."
+            )
+          ))
+        }
+
+        ## PowerPoint details card
         pptx_details <- NULL
         if (has_filename || has_template) {
-          ## Output filename display
-          filename_info <- NULL
+          detail_rows <- list()
+
           if (has_filename) {
             display_name <- rv$report_filename
             if (!grepl("\\.pptx$", display_name, ignore.case = TRUE)) {
               display_name <- paste0(display_name, ".pptx")
             }
-            filename_info <- htmltools::tags$p(
-              style = "font-weight:bold; color:#e45600; margin-bottom:5px;",
-              paste0("Output: ", display_name)
-            )
+            detail_rows <- c(detail_rows, list(
+              htmltools::tags$div(
+                class = "pptx-detail-row",
+                htmltools::tags$span(class = "detail-icon", shiny::icon("file")),
+                htmltools::tags$span(class = "detail-label", "Output"),
+                htmltools::tags$span(class = "detail-value", display_name)
+              )
+            ))
           }
 
-          ## Template and layout display
-          template_info <- NULL
-          layout_display <- NULL
           if (has_template) {
             template_name <- basename(rv$uploaded_template$name)
-            template_info <- htmltools::tags$p(
-              style = "font-weight:bold; color:#e45600; margin-bottom:5px;",
-              paste0("Template: ", template_name)
-            )
+            detail_rows <- c(detail_rows, list(
+              htmltools::tags$div(
+                class = "pptx-detail-row",
+                htmltools::tags$span(class = "detail-icon", shiny::icon("file-powerpoint")),
+                htmltools::tags$span(class = "detail-label", "Template"),
+                htmltools::tags$span(class = "detail-value", template_name)
+              )
+            ))
+          }
 
-            if (!is.null(rv$selected_layout_name) && !is.null(rv$extracted_layouts)) {
-              ## Find the selected layout row to get the image path
-              layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == rv$selected_layout_name, ]
-              if (nrow(layout_row) > 0) {
-                image_path <- layout_row$image_path[1]
-                layout_display <- htmltools::tags$div(
-                  style = "margin-top: 10px;",
-                  htmltools::tags$img(
-                    src = image_path,
-                    width = "150px",
-                    style = "display: block; margin-bottom: 5px; border: 1px solid #ccc;"
-                  ),
-                  htmltools::tags$div(
-                    style = "font-size: 0.9em; max-width: 150px;",
-                    htmltools::tags$div("Layout:"),
-                    htmltools::tags$div(style = "font-weight: bold;", rv$selected_layout_name)
-                  )
+          ## Layout preview
+          layout_preview <- NULL
+          if (!is.null(rv$selected_layout_name) && !is.null(rv$extracted_layouts)) {
+            layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == rv$selected_layout_name, ]
+            if (nrow(layout_row) > 0) {
+              image_path <- layout_row$image_path[1]
+              slot_count <- layout_row$placeholder_count[1]
+              slot_badge <- NULL
+              if (!is.na(slot_count)) {
+                slot_badge <- htmltools::tags$span(
+                  class = "layout-carousel-slots",
+                  paste0(slot_count, if (slot_count == 1L) " slot" else " slots")
                 )
               }
+              layout_preview <- htmltools::tags$div(
+                class = "pptx-layout-preview",
+                htmltools::tags$img(src = image_path),
+                htmltools::tags$div(
+                  class = "layout-caption",
+                  htmltools::tags$span(class = "layout-name", rv$selected_layout_name),
+                  slot_badge
+                )
+              )
             }
           }
 
           pptx_details <- htmltools::tags$div(
-            htmltools::tags$h5("PowerPoint Details:"),
-            filename_info,
-            template_info,
-            layout_display,
-            htmltools::tags$hr()
+            class = "pptx-details-card",
+            detail_rows,
+            layout_preview
           )
         }
 
-        htmltools::tagList(
-          pptx_details,
-          htmltools::tags$h6(
-            "These files reflect the current state of your local repository."
-          ),
-          htmltools::tags$ul(
-            lapply(selected_items(), function(file) {
-              htmltools::tags$li(file)
-            })
+        ## File list section
+        file_list <- NULL
+        if (has_files) {
+          ## Resolve to absolute paths for resource registration
+          abs_files <- vapply(files, function(f) {
+            if (startsWith(f, "/") || grepl("^[A-Za-z]:", f)) f
+            else file.path(getwd(), f)
+          }, character(1), USE.NAMES = FALSE)
+
+          ## Register resource paths for image thumbnails
+          img_dirs <- unique(dirname(abs_files))
+          for (i in seq_along(img_dirs)) {
+            path_name <- paste0("filelist_imgs_", i)
+            if (!(path_name %in% names(shiny::resourcePaths()))) {
+              shiny::addResourcePath(path_name, img_dirs[i])
+            }
+          }
+
+          file_items <- lapply(seq_along(files), function(idx) {
+            file <- files[[idx]]
+            abs_file <- abs_files[[idx]]
+            fname <- basename(file)
+            dname <- dirname(file)
+            dir_label <- if (dname == "." || dname == "") NULL else {
+              htmltools::tags$span(class = "file-dir", dname)
+            }
+
+            ## Build thumbnail URL
+            dir_idx <- which(img_dirs == dirname(abs_file))[1]
+            thumb_src <- paste0("filelist_imgs_", dir_idx, "/", fname)
+
+            htmltools::tags$div(
+              class = "file-list-item",
+              htmltools::tags$img(class = "file-thumbnail", src = thumb_src),
+              htmltools::tags$span(class = "file-name", fname),
+              dir_label
+            )
+          })
+          file_list <- htmltools::tags$div(
+            class = "file-list-container",
+            htmltools::tags$div(class = "file-list-heading", "Selected Images"),
+            file_items,
+            ## Lightbox overlay for expanded image view
+            htmltools::tags$div(
+              id = "filelist-lightbox",
+              class = "filelist-lightbox",
+              onclick = "this.classList.remove('active');",
+              htmltools::tags$span(class = "close-hint", "Click anywhere to close"),
+              htmltools::tags$img(id = "filelist-lightbox-img", src = "", alt = "Preview")
+            ),
+            htmltools::tags$script(htmltools::HTML("
+              $(document).off('click.filelist').on('click.filelist', '.file-thumbnail', function() {
+                $('#filelist-lightbox-img').attr('src', $(this).attr('src'));
+                $('#filelist-lightbox').addClass('active');
+              });
+            "))
           )
-        )
+        }
+
+        htmltools::tagList(pptx_details, file_list)
       })
       log4r::debug(.le$logger, "pptx_server module loaded successfully")
 

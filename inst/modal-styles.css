@@ -560,6 +560,196 @@
 }
 
 /* ============================================
+   Main Content Area
+   ============================================ */
+
+/* Summary card for PowerPoint details */
+.pptx-details-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Each detail row: icon + label + value */
+.pptx-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.pptx-detail-row + .pptx-detail-row {
+  border-top: 1px solid #f1f5f9;
+}
+
+.pptx-detail-row .detail-icon {
+  color: #e45600;
+  font-size: 1rem;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.pptx-detail-row .detail-label {
+  color: #64748b;
+  font-size: 0.875rem;
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.pptx-detail-row .detail-value {
+  color: #1e293b;
+  font-weight: 600;
+  font-size: 0.925rem;
+}
+
+/* Layout preview container */
+.pptx-layout-preview {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+  text-align: center;
+}
+
+.pptx-layout-preview img {
+  max-width: 200px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 0.75rem;
+}
+
+.pptx-layout-preview .layout-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.pptx-layout-preview .layout-caption .layout-name {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* File list section */
+.file-list-container {
+  margin-top: 1rem;
+}
+
+.file-list-container .file-list-heading {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #1e293b;
+  margin-bottom: 0.75rem;
+}
+
+.file-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.5rem;
+  transition: background 0.15s ease;
+}
+
+.file-list-item:hover {
+  background: #f1f5f9;
+}
+
+.file-list-item .file-icon {
+  color: #e45600;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.file-list-item .file-thumbnail {
+  width: 1rem;
+  height: 1rem;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.file-list-item .file-thumbnail:hover {
+  transform: scale(1.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* File list lightbox overlay */
+.filelist-lightbox {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 10000;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+}
+
+.filelist-lightbox.active {
+  display: flex;
+}
+
+.filelist-lightbox img {
+  max-width: 90%;
+  max-height: 90%;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.filelist-lightbox .close-hint {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: white;
+  font-size: 1.2em;
+}
+
+.file-list-item .file-name {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+.file-list-item .file-dir {
+  color: #64748b;
+  font-size: 0.8rem;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: #64748b;
+}
+
+.empty-state .empty-state-icon {
+  font-size: 2.5rem;
+  color: #cbd5e1;
+  margin-bottom: 1rem;
+}
+
+.empty-state .empty-state-text {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  max-width: 350px;
+  margin: 0 auto;
+}
+
+/* ============================================
    Responsive adjustments
    ============================================ */
 @media (max-width: 576px) {
