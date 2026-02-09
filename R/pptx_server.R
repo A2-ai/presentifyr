@@ -45,19 +45,66 @@ pptx_server <- function(id) {
               .modal-header { padding-bottom: 10px; margin-bottom: 0; }
               .modal-body { padding-top: 10px; }
             "),
-            textInput(
-              ns("pptx_filename"),
-              label       = "PowerPoint File Name (Extension Not Required):",
-              placeholder = "presentation"
-            ),
+            shiny::uiOutput(ns("filename_input_ui")),
+            shiny::uiOutput(ns("filename_label_ui")),
             shiny::uiOutput(ns("configs_options")),
             footer = shiny::modalButton("Close")
           )
         )
       }
 
+      ## Render filename input with conditional clear button
+      output$filename_input_ui <- shiny::renderUI({
+        current_value <- if (!is.null(rv$report_filename)) rv$report_filename else ""
+        has_value <- nzchar(current_value)
+
+        htmltools::tags$div(
+          class = "form-group shiny-input-container",
+          htmltools::tags$label(
+            class = "control-label",
+            `for` = ns("pptx_filename"),
+            "PowerPoint File Name (Extension Not Required):"
+          ),
+          htmltools::tags$div(
+            class = "input-with-clear",
+            shiny::textInput(
+              ns("pptx_filename"),
+              label = NULL,
+              value = current_value,
+              placeholder = "presentation"
+            ),
+            if (has_value) {
+              shiny::actionButton(
+                ns("clear_filename"),
+                htmltools::tags$i(class = "fa fa-times"),
+                class = "btn-clear-input"
+              )
+            }
+          )
+        )
+      })
+
+      ## Clear filename button
+      shiny::observeEvent(input$clear_filename, {
+        rv$report_filename <- ""
+      })
+
       shiny::observeEvent(input$pptx_filename, {
         rv$report_filename <- trimws(input$pptx_filename)
+      })
+
+      ## Render filename label separately so it doesn't affect template upload
+      output$filename_label_ui <- shiny::renderUI({
+        if (!is.null(rv$report_filename) && nzchar(rv$report_filename)) {
+          display_name <- rv$report_filename
+          if (!grepl("\\.pptx$", display_name, ignore.case = TRUE)) {
+            display_name <- paste0(display_name, ".pptx")
+          }
+          htmltools::tags$p(
+            style = "font-weight:bold; color:#e45600; margin-top:5px;",
+            paste("Output file name:", display_name)
+          )
+        }
       })
 
       ## Separate renderUI for submit/clear buttons so fileInput doesn't re-render
@@ -66,7 +113,7 @@ pptx_server <- function(id) {
         file_ready <- !is.null(input[[file_input_id]])
         template_loaded <- !is.null(rv$uploaded_template)
         htmltools::tags$div(
-          class = "shiny-input-container",
+          class = "form-group shiny-input-container",
           style = "display: flex; gap: 10px;",
           shiny::actionButton(
             ns("submit_template"),
@@ -123,25 +170,11 @@ pptx_server <- function(id) {
         if (!is.null(rv$selected_layout_name)) {
           layout_label <- htmltools::tags$p(
             style = "font-weight:bold; color:#e45600; margin-top:5px;",
-            paste("Selected Layout:", rv$selected_layout_name)
-          )
-        }
-
-        filename_label <- NULL
-        if (!is.null(rv$report_filename) && nzchar(rv$report_filename)) {
-
-          display_name <- rv$report_filename
-          if (!grepl("\\.pptx$", display_name, ignore.case = TRUE))
-            display_name <- paste0(display_name, ".pptx")
-
-          filename_label <- htmltools::tags$p(
-            style = "font-weight:bold; color:#e45600; margin-top:5px;",
-            paste("Output file name:", display_name)
+            paste("Selected layout:", rv$selected_layout_name)
           )
         }
 
         shiny::tagList(
-          filename_label,
           file_upload_area,
           template_label,
           layout_area,
@@ -150,43 +183,101 @@ pptx_server <- function(id) {
       })
 
       buildLayoutSelectionUI <- function() {
-        layout_divs <- lapply(seq_len(nrow(rv$extracted_layouts)), function(i) {
-          layout_name <- rv$extracted_layouts$layout_name[i]
-          image_path <- rv$extracted_layouts$image_path[i]
-          placeholder_count <- rv$extracted_layouts$placeholder_count[i]
-
-          ## Build placeholder count badge
-          ph_badge <- if (!is.na(placeholder_count)) {
-            htmltools::tags$span(
-              style = "background: #e45600; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.85em;",
-              paste(placeholder_count, "slot(s)")
-            )
-          } else {
-            NULL
-          }
-
-          htmltools::tags$div(
-            style = "flex: 0 0 auto; margin: 10px;",
-            htmltools::tags$img(src = image_path, width = "150px", style = "display: block; margin-bottom: 5px;"),
-            htmltools::tags$div(
-              style = "margin: 0 0 5px 0; font-size: 0.9em; max-width: 150px;",
-              htmltools::tags$div("Layout:"),
-              htmltools::tags$div(style = "font-weight: bold;", layout_name),
-              ph_badge
-            ),
-            shiny::actionButton(ns(paste0("btn_layout_", layout_name)), "Select", style = "width: 150px;")
-          )
-        })
-
         htmltools::tags$div(
+          class = "form-group shiny-input-container",
           style = "margin-top: 10px;",
-          htmltools::tags$h4("Select a Layout"),
-          htmltools::tags$div(
-            style = "display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: flex-start;",
-            do.call(htmltools::tagList, layout_divs)
-          )
+          htmltools::tags$label(
+            class = "control-label",
+            "Select a Layout:"
+          ),
+          shiny::uiOutput(ns("layout_carousel"))
         )
       }
+
+      ## Initialize carousel index
+      rv$layout_index <- 1L
+
+      ## Render carousel layout selector
+      output$layout_carousel <- shiny::renderUI({
+        shiny::req(rv$extracted_layouts)
+        shiny::req(nrow(rv$extracted_layouts) > 0)
+
+        idx <- rv$layout_index
+        total <- nrow(rv$extracted_layouts)
+
+        layout_name <- rv$extracted_layouts$layout_name[idx]
+        image_path <- rv$extracted_layouts$image_path[idx]
+        placeholder_count <- rv$extracted_layouts$placeholder_count[idx]
+
+        htmltools::tags$div(
+          class = "layout-carousel",
+          ## Navigation row
+          htmltools::tags$div(
+            class = "layout-carousel-nav",
+            shiny::actionButton(
+              ns("layout_prev"),
+              label = htmltools::tags$i(class = "fa fa-chevron-left"),
+              class = "btn-carousel",
+              disabled = idx <= 1
+            ),
+            htmltools::tags$span(
+              class = "layout-carousel-counter",
+              paste(idx, "/", total)
+            ),
+            shiny::actionButton(
+              ns("layout_next"),
+              label = htmltools::tags$i(class = "fa fa-chevron-right"),
+              class = "btn-carousel",
+              disabled = idx >= total
+            )
+          ),
+          ## Layout preview
+          htmltools::tags$div(
+            class = "layout-carousel-preview",
+            htmltools::tags$img(src = image_path, class = "layout-carousel-img"),
+            htmltools::tags$div(
+              class = "layout-carousel-info",
+              htmltools::tags$div(class = "layout-carousel-name", layout_name),
+              htmltools::tags$span(
+                class = "layout-carousel-slots",
+                paste(placeholder_count, ifelse(placeholder_count == 1, "slot", "slots"))
+              )
+            )
+          ),
+          ## Select button
+          shiny::actionButton(
+            ns("layout_select_btn"),
+            label = if (identical(rv$selected_layout_name, layout_name)) {
+              htmltools::tagList(htmltools::tags$i(class = "fa fa-check"), " Selected")
+            } else {
+              "Select This Layout"
+            },
+            class = if (identical(rv$selected_layout_name, layout_name)) "btn-selected" else "btn-select",
+            width = "100%"
+          )
+        )
+      })
+
+      ## Navigate previous
+      shiny::observeEvent(input$layout_prev, {
+        if (rv$layout_index > 1) {
+          rv$layout_index <- rv$layout_index - 1L
+        }
+      })
+
+      ## Navigate next
+      shiny::observeEvent(input$layout_next, {
+        if (rv$layout_index < nrow(rv$extracted_layouts)) {
+          rv$layout_index <- rv$layout_index + 1L
+        }
+      })
+
+      ## Select current layout
+      shiny::observeEvent(input$layout_select_btn, {
+        shiny::req(rv$extracted_layouts)
+        rv$selected_layout_name <- rv$extracted_layouts$layout_name[rv$layout_index]
+        log4r::info(.le$logger, paste0("User selected layout: ", rv$selected_layout_name))
+      })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 3. Submit template - extract layouts
@@ -230,22 +321,6 @@ pptx_server <- function(id) {
         })
       })
 
-      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      # 4. Observers for each select layout button
-      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      shiny::observe({
-        if (is.null(rv$extracted_layouts) || nrow(rv$extracted_layouts) == 0) return()
-
-        for (layout_name in rv$extracted_layouts$layout_name) {
-          local({
-            ln <- layout_name
-            shiny::observeEvent(input[[paste0("btn_layout_", ln)]], {
-              rv$selected_layout_name <- ln
-              log4r::info(.le$logger, paste0("User selected layout: ", ln))
-            })
-          })
-        }
-      })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 5. Clear template logic + return to configs modal
@@ -321,7 +396,10 @@ pptx_server <- function(id) {
           title = "Upload PowerPoint for Syncing",
           shiny::fileInput(ns("uploaded_sync_file"), "Choose a PowerPoint File for Syncing:", accept = ".pptx"),
           footer = htmltools::tagList(
-            shiny::actionButton(ns("submit_sync_file"), "Submit Sync File"),
+            htmltools::tags$span(
+              title = "Sync and download the updated PowerPoint",
+              shiny::actionButton(ns("submit_sync_file"), htmltools::tagList(shiny::icon("sync"), "Sync PowerPoint"), class = "btn-sync")
+            ),
             shiny::modalButton("Close")
           )
         ))
@@ -400,11 +478,14 @@ pptx_server <- function(id) {
       output$button <- shiny::renderUI({
         shiny::req(selected_items())
         files_selected <- length(selected_items()) > 0
-        shiny::actionButton(
-          ns("preview_slides"),
-          if (files_selected) "Preview & Download" else "No files selected",
-          disabled = !files_selected,
-          width = "100%"
+        htmltools::tags$span(
+          title = "Arrange slides and generate PowerPoint",
+          shiny::actionButton(
+            ns("preview_slides"),
+            if (files_selected) "Preview & Download" else "No files selected",
+            disabled = !files_selected,
+            width = "100%"
+          )
         )
       })
 
@@ -612,7 +693,7 @@ pptx_server <- function(id) {
                 style = "margin-left: 10px; margin-right: 5px;",
                 htmltools::tags$span("Slot:", style = "font-size: 0.85em; color: #666; margin-right: 3px;"),
                 lapply(seq_len(ph_count), function(p) {
-                  btn_class <- if (p == current_pos) "btn-sm btn-primary" else "btn-sm btn-outline-secondary"
+                  btn_class <- if (p == current_pos) "btn-sm btn-primary" else "btn-sm btn-slot-unselected"
                   shiny::actionButton(
                     ns(paste0("pos_", slide_idx, "_", file_idx, "_", p)),
                     as.character(p),
@@ -661,6 +742,7 @@ pptx_server <- function(id) {
               ),
               htmltools::tags$span(
                 style = "flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;",
+                title = basename(file),
                 basename(file)
               ),
               position_btns,
@@ -669,7 +751,7 @@ pptx_server <- function(id) {
                 shiny::actionButton(
                   ns(paste0("split_before_", global_idx)),
                   shiny::icon("level-down-alt"),
-                  class = "btn-sm btn-outline-primary",
+                  class = "btn-sm btn-new-slide",
                   style = "margin-left: 5px;",
                   title = "Move this image to a new slide"
                 )
@@ -944,53 +1026,149 @@ pptx_server <- function(id) {
       )
 
       output$show_files <- shiny::renderUI({
-        template_info <- NULL
-        if (!is.null(rv$uploaded_template)) {
-          template_name <- basename(rv$uploaded_template$name)
+        ## Check if we have any PowerPoint details to show
+        has_filename <- !is.null(rv$report_filename) && nzchar(rv$report_filename)
+        has_template <- !is.null(rv$uploaded_template)
+        files <- selected_items()
+        has_files <- length(files) > 0
 
-          layout_display <- NULL
+        ## Empty state — nothing configured and no files selected
+        if (!has_filename && !has_template && !has_files) {
+          return(htmltools::tags$div(
+            class = "empty-state",
+            htmltools::tags$div(class = "empty-state-icon", shiny::icon("sliders")),
+            htmltools::tags$div(
+              class = "empty-state-text",
+              "Configure your presentation in Settings, then select images from the file tree."
+            )
+          ))
+        }
+
+        ## PowerPoint details card
+        pptx_details <- NULL
+        if (has_filename || has_template) {
+          detail_rows <- list()
+
+          if (has_filename) {
+            display_name <- rv$report_filename
+            if (!grepl("\\.pptx$", display_name, ignore.case = TRUE)) {
+              display_name <- paste0(display_name, ".pptx")
+            }
+            detail_rows <- c(detail_rows, list(
+              htmltools::tags$div(
+                class = "pptx-detail-row",
+                htmltools::tags$span(class = "detail-icon", shiny::icon("file")),
+                htmltools::tags$span(class = "detail-label", "Output"),
+                htmltools::tags$span(class = "detail-value", display_name)
+              )
+            ))
+          }
+
+          if (has_template) {
+            template_name <- basename(rv$uploaded_template$name)
+            detail_rows <- c(detail_rows, list(
+              htmltools::tags$div(
+                class = "pptx-detail-row",
+                htmltools::tags$span(class = "detail-icon", shiny::icon("file-powerpoint")),
+                htmltools::tags$span(class = "detail-label", "Template"),
+                htmltools::tags$span(class = "detail-value", template_name)
+              )
+            ))
+          }
+
+          ## Layout preview
+          layout_preview <- NULL
           if (!is.null(rv$selected_layout_name) && !is.null(rv$extracted_layouts)) {
-            ## Find the selected layout row to get the image path
             layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == rv$selected_layout_name, ]
             if (nrow(layout_row) > 0) {
               image_path <- layout_row$image_path[1]
-              layout_display <- htmltools::tags$div(
-                style = "margin-top: 10px;",
-                htmltools::tags$img(
-                  src = image_path,
-                  width = "150px",
-                  style = "display: block; margin-bottom: 5px; border: 1px solid #ccc;"
-                ),
+              slot_count <- layout_row$placeholder_count[1]
+              slot_badge <- NULL
+              if (!is.na(slot_count)) {
+                slot_badge <- htmltools::tags$span(
+                  class = "layout-carousel-slots",
+                  paste0(slot_count, if (slot_count == 1L) " slot" else " slots")
+                )
+              }
+              layout_preview <- htmltools::tags$div(
+                class = "pptx-layout-preview",
+                htmltools::tags$img(src = image_path),
                 htmltools::tags$div(
-                  style = "font-size: 0.9em; max-width: 150px;",
-                  htmltools::tags$div("Layout:"),
-                  htmltools::tags$div(style = "font-weight: bold;", rv$selected_layout_name)
+                  class = "layout-caption",
+                  htmltools::tags$span(class = "layout-name", rv$selected_layout_name),
+                  slot_badge
                 )
               )
             }
           }
 
-          template_info <- htmltools::tags$div(
-            htmltools::tags$p(
-              style = "font-weight:bold; color:#e45600; margin-bottom:5px;",
-              paste0("Template: ", template_name)
-            ),
-            layout_display,
-            htmltools::tags$hr()
+          pptx_details <- htmltools::tags$div(
+            class = "pptx-details-card",
+            detail_rows,
+            layout_preview
           )
         }
 
-        htmltools::tagList(
-          template_info,
-          htmltools::tags$h6(
-            "These files reflect the current state of your local repository."
-          ),
-          htmltools::tags$ul(
-            lapply(selected_items(), function(file) {
-              htmltools::tags$li(file)
-            })
+        ## File list section
+        file_list <- NULL
+        if (has_files) {
+          ## Resolve to absolute paths for resource registration
+          abs_files <- vapply(files, function(f) {
+            if (startsWith(f, "/") || grepl("^[A-Za-z]:", f)) f
+            else file.path(getwd(), f)
+          }, character(1), USE.NAMES = FALSE)
+
+          ## Register resource paths for image thumbnails
+          img_dirs <- unique(dirname(abs_files))
+          for (i in seq_along(img_dirs)) {
+            path_name <- paste0("filelist_imgs_", i)
+            if (!(path_name %in% names(shiny::resourcePaths()))) {
+              shiny::addResourcePath(path_name, img_dirs[i])
+            }
+          }
+
+          file_items <- lapply(seq_along(files), function(idx) {
+            file <- files[[idx]]
+            abs_file <- abs_files[[idx]]
+            fname <- basename(file)
+            dname <- dirname(file)
+            dir_label <- if (dname == "." || dname == "") NULL else {
+              htmltools::tags$span(class = "file-dir", dname)
+            }
+
+            ## Build thumbnail URL
+            dir_idx <- which(img_dirs == dirname(abs_file))[1]
+            thumb_src <- paste0("filelist_imgs_", dir_idx, "/", fname)
+
+            htmltools::tags$div(
+              class = "file-list-item",
+              htmltools::tags$img(class = "file-thumbnail", src = thumb_src),
+              htmltools::tags$span(class = "file-name", fname),
+              dir_label
+            )
+          })
+          file_list <- htmltools::tags$div(
+            class = "file-list-container",
+            htmltools::tags$div(class = "file-list-heading", "Selected Images"),
+            file_items,
+            ## Lightbox overlay for expanded image view
+            htmltools::tags$div(
+              id = "filelist-lightbox",
+              class = "filelist-lightbox",
+              onclick = "this.classList.remove('active');",
+              htmltools::tags$span(class = "close-hint", "Click anywhere to close"),
+              htmltools::tags$img(id = "filelist-lightbox-img", src = "", alt = "Preview")
+            ),
+            htmltools::tags$script(htmltools::HTML("
+              $(document).off('click.filelist').on('click.filelist', '.file-thumbnail', function() {
+                $('#filelist-lightbox-img').attr('src', $(this).attr('src'));
+                $('#filelist-lightbox').addClass('active');
+              });
+            "))
           )
-        )
+        }
+
+        htmltools::tagList(pptx_details, file_list)
       })
       log4r::debug(.le$logger, "pptx_server module loaded successfully")
 
