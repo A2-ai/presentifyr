@@ -28,6 +28,16 @@ presentifyr_options_message <- function() {
   optional_options <- c()
 
   ## Check for each used options
+  project_dir <- getOption("project.dir")
+  if (is.null(project_dir)) {
+    unset_options <- c(
+      unset_options,
+      "Using here::here() as project root; set options('project.dir') to change"
+    )
+  } else {
+    set_options <- c(set_options, paste("project.dir:", project_dir))
+  }
+
   root <- getOption("venv_dir")
   if (is.null(root)) {
     unset_options <- c(unset_options, "options('venv_dir') is not set. venv will be created in Project root")

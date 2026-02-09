@@ -25,9 +25,13 @@ sync_images <- function(input_pptx,
     stop("Invalid file type. Expected a .pptx file.")
   }
 
+  exclude_dirs <- default_exclude_dirs()
+
+  root_dir <- getOption("project.dir", default = here::here())
+
   image_files <- parse_directory_for_images(
-    directory = here::here(),
-    exclude_dirs = c("/renv/") ## Exclude unnecessary directories
+    directory = root_dir,
+    exclude_dirs = exclude_dirs ## Exclude unnecessary directories
   )
 
   if (length(image_files) == 0 || all(image_files == "")) {
@@ -37,10 +41,11 @@ sync_images <- function(input_pptx,
 
   log4r::debug(.le$logger, paste0("Found ", length(image_files), " image files"))
 
-  ## Use relative paths as keys to avoid basename collisions
-  project_root <- here::here()
-  relative_paths <- fs::path_rel(image_files, project_root)
-  image_dict <- as.list(stats::setNames(image_files, relative_paths))
+  ## Build keys matching alt-text: prefer project-relative paths; include basename for backward compatibility
+  keys_primary <- vapply(image_files, prfy_image_key, character(1), root = root_dir)
+  keys_legacy <- basename(image_files)
+
+  image_dict <- as.list(stats::setNames(image_files, keys_primary))
   temp_image_dict <- tempfile(fileext = ".json")
   jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
   log4r::debug(.le$logger, paste("Temporary image dictionary created at:", temp_image_dict))

@@ -137,7 +137,8 @@ add_images <- function(files, output_pptx,
                                      "left=", ph_left, "top=", ph_top,
                                      "width=", ph_width, "height=", ph_height))
 
-      alt_text <- paste0("{prfy}:", basename(file))
+      alt_text_key <- prfy_image_key(file)
+      alt_text <- paste0("{prfy}:", alt_text_key)
 
       img <- tryCatch({
         magick::image_read(file)
