@@ -61,6 +61,37 @@ test_that("sync_images correctly creates and writes JSON dictionary", {
   expect_equal(written_json, expected_json)
 })
 
+test_that("sync_images uses relative keys when under project root and falls back to basename", {
+  root <- tempfile()
+  dir.create(root)
+  img_rel <- file.path(root, "figs", "plot.png")
+  dir.create(dirname(img_rel), recursive = TRUE)
+  file.create(img_rel)
+
+  img_outside <- tempfile(fileext = ".png")
+
+  input_pptx <- tempfile(fileext = ".pptx")
+  file.create(input_pptx)
+  output_pptx <- tempfile(fileext = ".pptx")
+
+  mockery::stub(sync_images, "getOption", function(x, default) {
+    if (identical(x, "project.dir")) return(root)
+    base::getOption(x, default = default)
+  })
+  mockery::stub(sync_images, "dir.exists", function(...) TRUE)
+  mockery::stub(sync_images, "parse_directory_for_images", function(...) c(img_rel, img_outside))
+  mockery::stub(sync_images, "get_uv_path", function() "/mock/uv")
+  mockery::stub(sync_images, "processx::run", function(...) list(status = 0))
+  temp_json_file <- tempfile(fileext = ".json")
+  mockery::stub(sync_images, "tempfile", function(fileext = ".json") temp_json_file)
+
+  sync_images(input_pptx, output_pptx)
+
+  written_json <- jsonlite::read_json(temp_json_file)
+  expect_true("figs/plot.png" %in% names(written_json))
+  expect_true(basename(img_outside) %in% names(written_json))
+})
+
 test_that("sync_images fails when virtual environment does not exist", {
   input_pptx <- tempfile(fileext = ".pptx")
   file.create(input_pptx)
@@ -100,4 +131,3 @@ test_that("sync_images fails when Python script execution fails", {
     "Sync images script failed. Status:  1 Stderr:  Python script error occurred"
   )
 })
-

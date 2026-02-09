@@ -52,6 +52,22 @@ test_that("parse_directory_for_images excludes specified directories", {
   expect_equal(basename(result), c("image1.png"))
 })
 
+test_that("prfy_image_key prefers relative paths within root", {
+  root <- tempfile()
+  dir.create(root)
+  f <- file.path(root, "subdir", "img.png")
+  dir.create(dirname(f), recursive = TRUE)
+  file.create(f)
+
+  key <- prfy_image_key(f, root = root)
+  expect_equal(key, "subdir/img.png")
+
+  # outside root falls back to basename
+  g <- tempfile(fileext = ".png")
+  key2 <- prfy_image_key(g, root = root)
+  expect_equal(key2, basename(g))
+})
+
 test_that("parse_directory_for_images uses default exclude dirs helper", {
   parent_dir <- tempfile()
   dir.create(parent_dir)

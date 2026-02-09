@@ -53,6 +53,24 @@ default_exclude_dirs <- function() {
   unique(builtin[nzchar(builtin)])
 }
 
+#' Key used in alt-text and sync mapping for images
+#'
+#' Prefer path relative to project root when available to avoid basename collisions.
+#' Falls back to basename when the file is outside the root or relative computation fails.
+#'
+#' @keywords internal
+#' @noRd
+prfy_image_key <- function(file_path, root = getOption("project.dir", default = here::here())) {
+  file_path <- fs::path_abs(file_path)
+  root <- fs::path_abs(root)
+
+  rel <- tryCatch(fs::path_rel(file_path, start = root), error = function(e) NA_character_)
+
+  key <- if (!is.na(rel) && !startsWith(rel, "..")) rel else basename(file_path)
+  # Normalize separators for portability
+  gsub("\\\\", "/", key)
+}
+
 #' Creates a vector of available image file paths
 #'
 #' @param directory The path to the directory where image files will be searched.
