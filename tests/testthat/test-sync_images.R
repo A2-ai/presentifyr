@@ -89,7 +89,8 @@ test_that("sync_images uses relative keys when under project root and falls back
 
   written_json <- jsonlite::read_json(temp_json_file)
   expect_true("figs/plot.png" %in% names(written_json))
-  expect_true(basename(img_outside) %in% names(written_json))
+  # outside root should be skipped/unsupported; ensure only the in-root key is present
+  expect_equal(names(written_json), "figs/plot.png")
 })
 
 test_that("sync_images fails when virtual environment does not exist", {

@@ -45,31 +45,7 @@ sync_images <- function(input_pptx,
   keys_primary <- vapply(image_files, prfy_image_key, character(1), root = root_dir)
   keys_legacy <- basename(image_files)
 
-  file_info <- fs::file_info(image_files)
-  df <- rbind(
-    data.frame(key = keys_primary, path = image_files, mtime = file_info$modification_time, stringsAsFactors = FALSE),
-    data.frame(key = keys_legacy, path = image_files, mtime = file_info$modification_time, stringsAsFactors = FALSE)
-  )
-
-  df <- df[order(df$key, df$mtime, decreasing = c(FALSE, TRUE)), ]
-  dedup <- df[!duplicated(df$key), ]
-
-  dup_counts <- table(df$key)
-  dup_keys <- names(dup_counts[dup_counts > 1])
-  if (length(dup_keys) > 0) {
-    msg <- paste(
-      sprintf(
-        "%s (%d candidates, picked %s)",
-        dup_keys,
-        dup_counts[dup_keys],
-        dedup$path[match(dup_keys, dedup$key)]
-      ),
-      collapse = "; "
-    )
-    log4r::warn(.le$logger, paste("Duplicate image keys; using newest by mtime ->", msg))
-  }
-
-  image_dict <- as.list(stats::setNames(dedup$path, dedup$key))
+  image_dict <- as.list(stats::setNames(image_files, keys_primary))
   temp_image_dict <- tempfile(fileext = ".json")
   jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
   log4r::debug(.le$logger, paste("Temporary image dictionary created at:", temp_image_dict))
