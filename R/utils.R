@@ -25,18 +25,47 @@ get_uv_path <- function() {
   }
 }
 
+#' Default directories to ignore when scanning for images
+#'
+#' Priority: options("presentifyr.exclude_dirs") > env PRFY_EXCLUDE_DIRS (colon/semicolon/comma
+#' separated) > built-in defaults. Use character(0) to disable exclusions.
+#'
+#' @keywords internal
+#' @noRd
+default_exclude_dirs <- function() {
+  builtin <- c(
+    "renv", "rv", "rv/library", ".git", ".hg", ".svn",
+    "node_modules", ".Rproj.user", ".venv", ".direnv",
+    "__pycache__", "env", "site-library", ".cache"
+  )
+
+  env_val <- Sys.getenv("PRFY_EXCLUDE_DIRS", unset = "")
+  if (nzchar(env_val)) {
+    parts <- unlist(strsplit(env_val, "[;:,]", perl = TRUE))
+    builtin <- parts
+  }
+
+  opt_val <- getOption("presentifyr.exclude_dirs")
+  if (!is.null(opt_val)) {
+    builtin <- opt_val
+  }
+
+  unique(builtin[nzchar(builtin)])
+}
+
 #' Creates a vector of available image file paths
 #'
 #' @param directory The path to the directory where image files will be searched.
 #' @param recursive A logical value. If TRUE, searches for images recursively in subdirectories. Default is TRUE.
-#' @param exclude_dirs A vector of directory names to exclude from the search. Default is NULL. If NULL, no directories are excluded.
+#' @param exclude_dirs A vector of directory names to exclude from the search. Default pulls from
+#'   options/env via default_exclude_dirs(). Use character(0) to disable exclusions.
 #'
 #' @return A character vector of image file paths.
 #' @keywords internal
 #' @noRd
 parse_directory_for_images <- function(directory,
                                        recursive = TRUE,
-                                       exclude_dirs = NULL) {
+                                       exclude_dirs = default_exclude_dirs()) {
   log4r::debug(.le$logger, paste("Parsing directory for images:", directory))
 
   if (!dir.exists(directory)) {
@@ -46,22 +75,57 @@ parse_directory_for_images <- function(directory,
 
   image_pattern <- include_imgs()
 
-  image_files <- list.files(
-    path = directory,
-    pattern = image_pattern,
-    recursive = recursive,
-    full.names = TRUE,
-    ignore.case = TRUE
-  )
+  # helper: check if any path segment matches excluded dir names
+  should_skip <- function(rel_path) {
+    segments <- strsplit(rel_path, .Platform$file.sep, fixed = FALSE)[[1]]
+    any(segments %in% exclude_dirs)
+  }
+
+  image_files <- character(0)
+
+  if (!recursive) {
+    files_here <- fs::dir_ls(path = directory, recurse = FALSE, type = "file", glob = NULL, fail = FALSE)
+    rel_files <- fs::path_rel(files_here, directory)
+    keep <- vapply(rel_files, function(p) !should_skip(p), logical(1))
+    image_files <- files_here[keep & grepl(image_pattern, files_here, ignore.case = TRUE)]
+  } else {
+    queue <- c(directory)
+    visited_dirs <- 0L
+    skipped_dirs <- 0L
+
+    while (length(queue) > 0) {
+      current_dir <- queue[[1]]
+      queue <- queue[-1]
+      visited_dirs <- visited_dirs + 1L
+
+      entries <- fs::dir_ls(path = current_dir, recurse = FALSE, type = "any", fail = FALSE)
+      if (length(entries) == 0) next
+
+      dirs <- entries[fs::is_dir(entries)]
+      files <- entries[fs::is_file(entries)]
+
+      if (length(files) > 0) {
+        rel_files <- fs::path_rel(files, directory)
+        keep <- vapply(rel_files, function(p) !should_skip(p), logical(1))
+        image_files <- c(image_files, files[keep & grepl(image_pattern, files, ignore.case = TRUE)])
+      }
+
+      if (length(dirs) > 0) {
+        for (d in dirs) {
+          rel_dir <- fs::path_rel(d, directory)
+          if (should_skip(rel_dir)) {
+            skipped_dirs <- skipped_dirs + 1L
+            next
+          }
+          queue <- c(queue, d)
+        }
+      }
+    }
+
+    log4r::debug(.le$logger, paste("Visited", visited_dirs, "directories; skipped", skipped_dirs, "excluded directories"))
+  }
 
   log4r::debug(.le$logger, paste("Found", length(image_files), "image file(s)."))
-
-  if (!is.null(exclude_dirs) && length(image_files) > 0) {
-    exclude_pattern <- paste0(exclude_dirs, collapse = "|")
-    image_files <- image_files[!grepl(exclude_pattern, image_files, ignore.case = TRUE)]
-    log4r::info(.le$logger, paste("Excluded directories:", paste(exclude_dirs, collapse = ", ")))
-    log4r::debug(.le$logger, paste("Remaining", length(image_files), "image file(s) after exclusion."))
-  }
 
   if (length(image_files) == 0) {
     log4r::info(.le$logger, "No image files found in the specified directory.")

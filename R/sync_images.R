@@ -25,9 +25,11 @@ sync_images <- function(input_pptx,
     stop("Invalid file type. Expected a .pptx file.")
   }
 
+  exclude_dirs <- default_exclude_dirs()
+
   image_files <- parse_directory_for_images(
     directory = here::here(),
-    exclude_dirs = c("/renv/") ## Exclude unnecessary directories
+    exclude_dirs = exclude_dirs ## Exclude unnecessary directories
   )
 
   if (length(image_files) == 0 || all(image_files == "")) {
