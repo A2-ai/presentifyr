@@ -1,3 +1,16 @@
+#' Get Project Root
+#'
+#' Returns the directory of the current project
+#'
+#' @return Project directory
+#' @export
+get_project_dir <- function() {
+  getOption(
+    "project.dir",
+    default = here::here()
+  )
+}
+
 #' Default directories to ignore when scanning for images
 #'
 #' Priority: options("presentifyr.exclude_dirs") > env PRFY_EXCLUDE_DIRS (colon/semicolon/comma
@@ -33,7 +46,7 @@ default_exclude_dirs <- function() {
 #'
 #' @keywords internal
 #' @noRd
-prfy_image_key <- function(file_path, root = getOption("project.dir", default = here::here())) {
+prfy_image_key <- function(file_path, root = get_project_dir()) {
   file_path <- fs::path_abs(file_path)
   root <- fs::path_abs(root)
 

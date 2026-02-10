@@ -6,7 +6,7 @@
 #' dependencies) and python-pptx installation.
 #'
 #' @param project_dir The file path to the main project directory.
-#'   Must already exist. Default is `here::here()` (project root).
+#'   Must already exist. Default is `get_project_dir()`.
 #' @param report_dir_name The directory name for reports. Default is `NULL`
 #'   (uses reportifyr default).
 #' @param outputs_dir_name The directory name for artifacts. Default is `NULL`
@@ -27,7 +27,7 @@
 #' initialize_app()
 #' }
 initialize_app <- function(
-    project_dir = here::here(),
+    project_dir = get_project_dir(),
     report_dir_name = NULL,
     outputs_dir_name = NULL,
     verbose = TRUE

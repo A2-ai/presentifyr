@@ -27,7 +27,7 @@ sync_images <- function(input_pptx,
 
   exclude_dirs <- default_exclude_dirs()
 
-  root_dir <- getOption("project.dir", default = here::here())
+  root_dir <- get_project_dir()
 
   image_files <- parse_directory_for_images(
     directory = root_dir,
