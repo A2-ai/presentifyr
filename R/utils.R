@@ -1,30 +1,3 @@
-#' Gets the path to uv -- pre v0.5.0 installed to /.cargo/bin post v0.5.0 to /.local/bin
-#'
-#' @return A character string representing the file path to uv
-#' @keywords internal
-#' @noRd
-get_uv_path <- function() {
-  ## Check common user install locations first
-  uv_paths <- c(normalizePath("~/.local/bin/uv", mustWork = FALSE),
-                normalizePath("~/.cargo/bin/uv", mustWork = FALSE))
-
-  uv_path <- uv_paths[file.exists(uv_paths)][1]
-
-  ## If not found in user locations, check system PATH
-  if (is.na(uv_path) || is.null(uv_path)) {
-    uv_path <- Sys.which("uv")
-    if (uv_path == "") {
-      uv_path <- NA
-    }
-  }
-
-  if (is.na(uv_path)) {
-    stop("Please install uv with initialize_python or ensure uv is in your PATH")
-  } else {
-    return(uv_path)
-  }
-}
-
 #' Default directories to ignore when scanning for images
 #'
 #' Priority: options("presentifyr.exclude_dirs") > env PRFY_EXCLUDE_DIRS (colon/semicolon/comma

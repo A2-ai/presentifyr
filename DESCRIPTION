@@ -17,7 +17,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Depends: 
     R (>= 2.10)
-Imports: 
+Imports:
     bslib (>= 0.7.0),
     cli,
     jsonlite,
@@ -31,6 +31,7 @@ Imports:
     officer,
     pkglite (>= 0.2.2),
     processx (>= 3.8.4),
+    reportifyr,
     shiny (>= 1.8.1.1),
     stats
 Suggests:

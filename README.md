@@ -22,14 +22,14 @@ install.packages("devtools") # If not already installed.
 devtools::load_all("path/to/presentifyr") # The path is the relative path to the `presentifyr` repository from your current working directory. 
 ```
 
-## Initializing Python
+## Initialization
 
-A mixture of Python and R is used within `presentifyr`, thus requiring a virtual environment (.venv) to be created and managed. Fortunately, this is automated through the use of the `initialize_python()` function.
+A mixture of Python and R is used within `presentifyr`, thus requiring a virtual environment (.venv) to be created and managed. The `initialize_app()` function handles this by first initializing the reportifyr project (uv, .venv, and base Python dependencies) and then installing python-pptx.
 
-Before launching the app, please run the following to initialize a .venv and to install all required Python components:
+Before launching the app, please run the following:
 
 ``` r
-initialize_python()
+initialize_app()
 ```
 
 ## Launching the Application
