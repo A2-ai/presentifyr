@@ -5,7 +5,7 @@
 \title{Initialize presentifyr Application Environment}
 \usage{
 initialize_app(
-  project_dir = here::here(),
+  project_dir = get_project_dir(),
   report_dir_name = NULL,
   outputs_dir_name = NULL,
   verbose = TRUE
@@ -13,7 +13,7 @@ initialize_app(
 }
 \arguments{
 \item{project_dir}{The file path to the main project directory.
-Must already exist. Default is \code{here::here()} (project root).}
+Must already exist. Default is \code{get_project_dir()}.}
 
 \item{report_dir_name}{The directory name for reports. Default is \code{NULL}
 (uses reportifyr default).}
