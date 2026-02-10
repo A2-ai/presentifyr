@@ -6,22 +6,30 @@
 \usage{
 add_images(
   files,
-  repo_url,
   output_pptx,
   slide_layout_name = NULL,
-  base_pptx = NULL
+  base_pptx = NULL,
+  slide_groups = NULL,
+  slide_positions = NULL
 )
 }
 \arguments{
-\item{files}{A list of image file paths to be inserted into the .pptx file.}
-
-\item{repo_url}{The url of the repository where an image is stored.}
+\item{files}{A list of image file paths to be inserted into the .pptx file.
+Used when slide_groups is NULL (one image per slide).}
 
 \item{output_pptx}{The file path where the modified .pptx file will be saved.}
 
 \item{slide_layout_name}{A character string indicating the name of the PowerPoint slide layout to be used. Default is NULL. If NULL, slide_layout_index is set to 1.}
 
 \item{base_pptx}{The file path to an existing .pptx file that serves as a template. Default is NULL. If NULL, a blank presentation is used.}
+
+\item{slide_groups}{A list of character vectors, where each vector contains file paths
+for images to be placed on a single slide. If provided, \code{files} is ignored.
+Images are placed in placeholders in order (top-left to bottom-right).}
+
+\item{slide_positions}{A list of integer vectors parallel to slide_groups, indicating
+which placeholder (1-indexed) each image should be placed in. If NULL, images are
+placed in placeholders sequentially (1, 2, 3...).}
 }
 \description{
 Adds images from file to a given PowerPoint presentation (.pptx) file.
@@ -30,7 +38,6 @@ Adds images from file to a given PowerPoint presentation (.pptx) file.
 \dontrun{
 add_images(
   files = files,
-  repo_url = repo_url,
   base_pptx = NULL,
   output_pptx = output_pptx
 )

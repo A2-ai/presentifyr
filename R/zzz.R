@@ -24,53 +24,29 @@
 #' }
 presentifyr_options_message <- function() {
   set_options <- c()
-  unset_options <- c()
-  optional_options <- c()
+  project_options <- c()
+  version_options <- c()
 
-  ## Check for each used options
+  ## Project dir
   project_dir <- getOption("project.dir")
   if (is.null(project_dir)) {
-    unset_options <- c(
-      unset_options,
-      "Using here::here() as project root; set options('project.dir') to change"
+    project_options <- c(
+      project_options,
+      "Using here::here() as project root, set options('project.dir') to change"
     )
   } else {
     set_options <- c(set_options, paste("project.dir:", project_dir))
   }
 
-  root <- getOption("venv_dir")
-  if (is.null(root)) {
-    unset_options <- c(unset_options, "options('venv_dir') is not set. venv will be created in Project root")
-  } else {
-    set_options <- c(set_options, paste("venv_dir:", root))
-  }
-  ## Nice to haves
-  uvversion <- getOption("uv.version")
-  if (is.null(uvversion)) {
-    optional_options <- c(optional_options, "options('uv.version') is not set. Default is 0.5.1")
-  } else {
-    set_options <- c(set_options, paste("uv.version:", uvversion))
-  }
-
-  pyversion <- getOption("python.version")
-  if (is.null(pyversion)) {
-    optional_options <- c(optional_options, "options('python.version') is not set. Default is system version")
-  } else {
-    set_options <- c(set_options, paste("python.version:", pyversion))
-  }
-
+  ## Version options
   pptx_vers <- getOption("python-pptx.version")
   if (is.null(pptx_vers)) {
-    optional_options <- c(optional_options, "options('python-pptx.version') is not set. Default is 1.0.2")
+    version_options <- c(
+      version_options,
+      "Using python-pptx version 1.0.2, set options('python-pptx.version') to change"
+    )
   } else {
     set_options <- c(set_options, paste("python-pptx.version:", pptx_vers))
-  }
-
-  pillow_vers <- getOption("pillow.version")
-  if (is.null(pillow_vers)) {
-    optional_options <- c(optional_options, "options('pillow.version') is not set. Default is 11.1.0")
-  } else {
-    set_options <- c(set_options, paste("pillow.version:", pillow_vers))
   }
 
   ## Format .onAttach message
@@ -88,31 +64,27 @@ presentifyr_options_message <- function() {
     )
   }
 
-  if (length(unset_options)) {
+  if (length(project_options)) {
     msg <- paste0(
       msg,
       cli::rule(
-        left = cli::style_bold("Needed presentifyr options")
+        left = cli::style_bold("Project options")
       ), "\n",
       paste0(
-        cli::col_red(cli::symbol$cross), " ", unset_options,
+        cli::col_yellow(cli::symbol$square), " ", project_options,
         collapse = "\n"
-      ), "\n",
-      paste0(
-        cli::col_cyan(cli::symbol$info), " ",
-        cli::format_inline("Please set all options for package to work."), "\n"
-      )
+      ), "\n"
     )
   }
 
-  if (length(optional_options)) {
+  if (length(version_options)) {
     msg <- paste0(
       msg,
       cli::rule(
-        left = cli::style_bold("Optional version options")
+        left = cli::style_bold("Version options")
       ), "\n",
       paste0(
-        cli::col_yellow(cli::symbol$square), " ", optional_options,
+        cli::col_yellow(cli::symbol$square), " ", version_options,
         collapse = "\n"
       )
     )

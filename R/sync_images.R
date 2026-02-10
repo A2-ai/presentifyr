@@ -27,7 +27,7 @@ sync_images <- function(input_pptx,
 
   exclude_dirs <- default_exclude_dirs()
 
-  root_dir <- getOption("project.dir", default = here::here())
+  root_dir <- get_project_dir()
 
   image_files <- parse_directory_for_images(
     directory = root_dir,
@@ -53,22 +53,10 @@ sync_images <- function(input_pptx,
   script <- system.file("scripts/sync_images.py", package = "presentifyr")
   args <- c("run", script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict)
 
-  if (is.null(getOption("venv_dir"))) {
-    log4r::info(.le$logger, "Setting options('venv_dir') to project root")
-    message("Setting options('venv_dir') to project root")
-
-    options("venv_dir" = here::here())
-  }
-
-  venv_path <- file.path(getOption("venv_dir"), ".venv")
-
-  if (!dir.exists(venv_path)) {
-    log4r::error(.le$logger, "Virtual environment not found. Please initialize with initialize_python")
-    stop("Create virtual environment with initialize_python")
-  }
-  log4r::debug(.le$logger, paste("venv_path resolved to: ", venv_path))
-
-  uv_path <- get_uv_path()
+  paths <- reportifyr::get_venv_uv_paths()
+  venv_path <- paths$venv
+  uv_path <- paths$uv
+  log4r::debug(.le$logger, paste("venv_path resolved to:", venv_path))
   log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
 
   result <- tryCatch({

@@ -39,7 +39,9 @@ test_that("sync_images correctly creates and writes JSON dictionary", {
   file.create(input_pptx)
   output_pptx <- tempfile(fileext = ".pptx")
 
-  mockery::stub(sync_images, "dir.exists", function(path) TRUE)
+  mockery::stub(sync_images, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/uv", venv = "/mock/venv")
+  })
 
   mock_images <- c("/path/to/image1.png", "/path/to/image2.png")
   mockery::stub(sync_images, "parse_directory_for_images", function(...) mock_images)
@@ -78,9 +80,10 @@ test_that("sync_images uses relative keys when under project root and falls back
     if (identical(x, "project.dir")) return(root)
     base::getOption(x, default = default)
   })
-  mockery::stub(sync_images, "dir.exists", function(...) TRUE)
+  mockery::stub(sync_images, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/uv", venv = "/mock/venv")
+  })
   mockery::stub(sync_images, "parse_directory_for_images", function(...) c(img_rel, img_outside))
-  mockery::stub(sync_images, "get_uv_path", function() "/mock/uv")
   mockery::stub(sync_images, "processx::run", function(...) list(status = 0))
   temp_json_file <- tempfile(fileext = ".json")
   mockery::stub(sync_images, "tempfile", function(fileext = ".json") temp_json_file)
@@ -98,12 +101,14 @@ test_that("sync_images fails when virtual environment does not exist", {
   file.create(input_pptx)
   output_pptx <- tempfile(fileext = ".pptx")
 
-  mockery::stub(sync_images, "dir.exists", function(path) FALSE)
+  mockery::stub(sync_images, "reportifyr::get_venv_uv_paths", function() {
+    stop("Create virtual environment with initialize_python")
+  })
 
   mock_images <- c("/path/to/image1.png", "/path/to/image2.png")
   mockery::stub(sync_images, "parse_directory_for_images", function(...) mock_images)
 
-  expect_error(sync_images(input_pptx, output_pptx), "Create virtual environment with initialize_python")
+  expect_error(sync_images(input_pptx, output_pptx), "Create virtual environment")
 })
 
 
@@ -112,8 +117,9 @@ test_that("sync_images fails when Python script execution fails", {
   file.create(input_pptx)
   output_pptx <- tempfile(fileext = ".pptx")
 
-  mockery::stub(sync_images, "dir.exists", function(path) TRUE)
-  mockery::stub(sync_images, "get_uv_path", function() "/mock/path/to/uv")
+  mockery::stub(sync_images, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/path/to/uv", venv = "/mock/venv")
+  })
 
   mock_images <- c("/path/to/image1.png", "/path/to/image2.png")
   mockery::stub(sync_images, "parse_directory_for_images", function(...) mock_images)

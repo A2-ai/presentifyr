@@ -24,9 +24,11 @@ test_that("extract_layouts fails when virtual environment does not exist", {
   output_dir <- tempfile()
   dir.create(output_dir)
 
-  mockery::stub(extract_layouts, "dir.exists", function(path) FALSE)
+  mockery::stub(extract_layouts, "reportifyr::get_venv_uv_paths", function() {
+    stop("Create virtual environment with initialize_python")
+  })
 
-  expect_error(extract_layouts(base_pptx, output_dir), "Create virtual environment with initialize_python")
+  expect_error(extract_layouts(base_pptx, output_dir), "Create virtual environment")
 })
 
 test_that("extract_layouts fails when Python script execution fails", {
@@ -35,9 +37,9 @@ test_that("extract_layouts fails when Python script execution fails", {
   output_dir <- tempfile()
   dir.create(output_dir)
 
-  mockery::stub(extract_layouts, "dir.exists", function(path) TRUE)
-
-  mockery::stub(extract_layouts, "get_uv_path", function() "/mock/path/to/uv")
+  mockery::stub(extract_layouts, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/path/to/uv", venv = "/mock/venv")
+  })
 
   mock_run_fail <- function(...) {
     e <- simpleError("Python script execution failed")
@@ -61,8 +63,9 @@ test_that("extract_layouts correctly parses layout indices from filenames", {
   output_dir <- tempfile()
   dir.create(output_dir)
 
-  mockery::stub(extract_layouts, "dir.exists", function(path) TRUE)
-  mockery::stub(extract_layouts, "get_uv_path", function() "/mock/path/to/uv")
+  mockery::stub(extract_layouts, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/path/to/uv", venv = "/mock/venv")
+  })
   mockery::stub(extract_layouts, "processx::run", function(...) {
     list(stdout = "Python script executed successfully", stderr = "", status = 0)
   })
