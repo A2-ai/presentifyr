@@ -41,6 +41,33 @@ def should_replace_image(shape, new_image_path, logger):
         return True, f"hash computation failed ({e})"
 
 
+def find_footer_placeholder(slide):
+    """Find the footer placeholder on a slide, if it exists.
+
+    Footer placeholders have placeholder index 11 in the PowerPoint spec.
+    """
+    for shape in slide.placeholders:
+        if shape.placeholder_format.idx == 11:
+            return shape
+    return None
+
+
+def should_update_footer(footer_shape, new_text, logger):
+    """Determine if footer text should be updated based on hash comparison."""
+    try:
+        existing_text = footer_shape.text or ""
+        existing_hash = compute_text_hash(existing_text)
+        new_hash = compute_text_hash(new_text)
+
+        if existing_hash == new_hash:
+            return False, "unchanged (hashes match)"
+        else:
+            return True, "content changed"
+    except Exception as e:
+        logger.warning(f"Could not compare footer: {e}. Will update.")
+        return True, f"comparison failed ({e})"
+
+
 def should_update_notes(slide, new_notes_text, logger):
     """Determine if slide notes should be updated based on hash comparison."""
     try:
@@ -163,7 +190,9 @@ def sync_images(input_pptx, output_pptx, image_dict):
         'images_skipped': 0,
         'images_not_found': 0,
         'notes_updated': 0,
-        'notes_skipped': 0
+        'notes_skipped': 0,
+        'footer_updated': 0,
+        'footer_skipped': 0
     }
 
     logger.info("Scanning slides for image and footnote sync")
@@ -243,30 +272,47 @@ def sync_images(input_pptx, output_pptx, image_dict):
                     for name, meta in slide_metadata_list.items()
                 )
 
-                # Check if notes content has changed using hash comparison
-                should_update, reason = should_update_notes(slide, combined_notes, logger)
+                # Check for footer placeholder first; fall back to slide notes
+                footer_shape = find_footer_placeholder(slide)
 
-                if should_update:
-                    try:
-                        notes_slide = slide.notes_slide
-                        text_frame = notes_slide.notes_text_frame
-                        if text_frame is not None:
-                            text_frame.text = combined_notes
-                            logger.info(f"Slide {slide_index}: Updated notes ({reason})")
-                            stats['notes_updated'] += 1
-                        else:
-                            logger.warning(f"Slide {slide_index}: No notes text frame available")
-                    except Exception as e:
-                        logger.warning(f"Slide {slide_index}: Could not update notes - {e}")
+                if footer_shape is not None:
+                    should_update, reason = should_update_footer(footer_shape, combined_notes, logger)
+                    if should_update:
+                        try:
+                            footer_shape.text = combined_notes
+                            logger.info(f"Slide {slide_index}: Updated footer ({reason})")
+                            stats['footer_updated'] += 1
+                        except Exception as e:
+                            logger.warning(f"Slide {slide_index}: Could not update footer - {e}")
+                    else:
+                        logger.debug(f"Slide {slide_index}: Skipping footer - {reason}")
+                        stats['footer_skipped'] += 1
                 else:
-                    logger.debug(f"Slide {slide_index}: Skipping notes - {reason}")
-                    stats['notes_skipped'] += 1
+                    # No footer placeholder — fall back to slide notes
+                    should_update, reason = should_update_notes(slide, combined_notes, logger)
+                    if should_update:
+                        try:
+                            notes_slide = slide.notes_slide
+                            text_frame = notes_slide.notes_text_frame
+                            if text_frame is not None:
+                                text_frame.text = combined_notes
+                                logger.info(f"Slide {slide_index}: Updated notes ({reason})")
+                                stats['notes_updated'] += 1
+                            else:
+                                logger.warning(f"Slide {slide_index}: No notes text frame available")
+                        except Exception as e:
+                            logger.warning(f"Slide {slide_index}: Could not update notes - {e}")
+                    else:
+                        logger.debug(f"Slide {slide_index}: Skipping notes - {reason}")
+                        stats['notes_skipped'] += 1
 
         if not matched_images:
             logger.warning(f"Slide {slide_index}: No matching alt-text found")
 
     logger.info(f"Sync complete: {stats['images_replaced']} images replaced, "
                 f"{stats['images_skipped']} images unchanged, "
+                f"{stats['footer_updated']} footers updated, "
+                f"{stats['footer_skipped']} footers unchanged, "
                 f"{stats['notes_updated']} notes updated, "
                 f"{stats['notes_skipped']} notes unchanged")
 

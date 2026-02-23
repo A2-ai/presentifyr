@@ -76,6 +76,14 @@ add_images <- function(files, output_pptx,
   log4r::debug(.le$logger, paste("Found", nrow(usable_placeholders_df), "usable placeholder(s):",
                                   paste(usable_placeholders_df$ph_label, collapse = ", ")))
 
+  ## Detect footer placeholder for footnote insertion
+  footer_ph_label <- NULL
+  footer_mask <- grepl("Footer Placeholder", placeholders$ph_label, ignore.case = TRUE)
+  if (any(footer_mask)) {
+    footer_ph_label <- placeholders$ph_label[footer_mask][1]
+    log4r::debug(.le$logger, paste("Footer placeholder detected:", footer_ph_label))
+  }
+
   ## Determine slide groups
   if (is.null(slide_groups)) {
     ## Backward compatibility: one image per slide
@@ -103,9 +111,11 @@ add_images <- function(files, output_pptx,
     ppt <- officer::add_slide(ppt, layout = selected_layout, master = selected_master)
 
     ## Clear non-image placeholders (title, etc.) but keep usable ones for images
+    ## Also preserve footer placeholder if present (used for footnote insertion)
     for (ph_label in placeholders$ph_label) {
       if (!ph_label %in% usable_placeholders_df$ph_label &&
-          !grepl("Slide Number Placeholder", ph_label)) {
+          !grepl("Slide Number Placeholder", ph_label) &&
+          !identical(ph_label, footer_ph_label)) {
         ppt <- officer::ph_with(
           ppt,
           value = "",
@@ -187,7 +197,7 @@ add_images <- function(files, output_pptx,
       }
     }
 
-    ## Combine metadata from all images into slide notes
+    ## Combine metadata from all images into footnote content
     if (length(slide_metadata_list) > 0) {
       combined_notes <- paste(
         sapply(names(slide_metadata_list), function(name) {
@@ -195,8 +205,20 @@ add_images <- function(files, output_pptx,
         }),
         collapse = "\n\n"
       )
-      ppt <- officer::set_notes(ppt, value = combined_notes, location = officer::notes_location_type("body"))
-      log4r::debug(.le$logger, paste("Added combined notes for slide", slide_idx))
+
+      if (!is.null(footer_ph_label)) {
+        ## Insert footnotes into the footer placeholder
+        ppt <- officer::ph_with(
+          ppt,
+          value = combined_notes,
+          location = officer::ph_location_label(ph_label = footer_ph_label)
+        )
+        log4r::debug(.le$logger, paste("Added footnotes to footer for slide", slide_idx))
+      } else {
+        ## Fall back to slide notes when no footer placeholder exists
+        ppt <- officer::set_notes(ppt, value = combined_notes, location = officer::notes_location_type("body"))
+        log4r::debug(.le$logger, paste("Added combined notes for slide", slide_idx))
+      }
     }
   }
   print(ppt, target = output_pptx)
