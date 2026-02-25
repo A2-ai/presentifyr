@@ -299,7 +299,11 @@ pptx_server <- function(id) {
         base_pptx <- rv$uploaded_template$datapath
         log4r::debug(.le$logger, paste0("Template uploaded: ", base_pptx))
 
-        output_dir <- tempdir()
+        output_dir <- file.path(tempdir(), "prfy_layouts")
+        dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+        ## Clean old layout files before extracting new ones
+        old_files <- list.files(output_dir, full.names = TRUE)
+        if (length(old_files) > 0) unlink(old_files, force = TRUE)
         log4r::debug(.le$logger, paste0("Temporary output directory: ", output_dir))
 
         tryCatch({
@@ -343,14 +347,10 @@ pptx_server <- function(id) {
           log4r::info(.le$logger, "Template file removed")
         }
 
-        old_layout_files <- list.files(
-          tempdir(),
-          pattern = "\\.png$",
-          full.names = TRUE
-        )
-        if (length(old_layout_files) > 0) {
-          unlink(old_layout_files, force = TRUE)
-          log4r::debug(.le$logger, paste("Removed old layout PNGs:", paste(old_layout_files, collapse = ", ")))
+        layout_dir <- file.path(tempdir(), "prfy_layouts")
+        if (dir.exists(layout_dir)) {
+          unlink(layout_dir, recursive = TRUE, force = TRUE)
+          log4r::debug(.le$logger, paste("Removed layout directory:", layout_dir))
         }
 
         shiny::removeResourcePath("pptx_layouts")
@@ -1176,14 +1176,10 @@ pptx_server <- function(id) {
       # 8. Session close + clear layouts
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       session$onSessionEnded(function() {
-        old_layout_files <- list.files(
-          tempdir(),
-          pattern = "\\.png$",
-          full.names = TRUE
-        )
-        if (length(old_layout_files) > 0) {
-          unlink(old_layout_files, force = TRUE)
-          log4r::info(.le$logger, paste("Session ended, removed layout PNGs:", paste(old_layout_files, collapse = ", ")))
+        layout_dir <- file.path(tempdir(), "prfy_layouts")
+        if (dir.exists(layout_dir)) {
+          unlink(layout_dir, recursive = TRUE, force = TRUE)
+          log4r::info(.le$logger, paste("Session ended, removed layout directory:", layout_dir))
         }
 
         if ("pptx_layouts" %in% names(shiny::resourcePaths())) {
