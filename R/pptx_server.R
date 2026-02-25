@@ -42,6 +42,30 @@ pptx_server <- function(id) {
         rv$footnote_font <- modifyList(rv$footnote_font, updates)
       }
 
+      persist_footnote_font_inputs <- function() {
+        if (!is.null(input$fn_font_name) && nzchar(input$fn_font_name)) {
+          update_footnote_font(font_name = input$fn_font_name)
+        }
+        if (!is.null(input$fn_font_size) && is.numeric(input$fn_font_size)) {
+          update_footnote_font(font_size = input$fn_font_size)
+        }
+        if (!is.null(input$fn_bold)) {
+          update_footnote_font(bold = isTRUE(input$fn_bold))
+        }
+        if (!is.null(input$fn_italic)) {
+          update_footnote_font(italic = isTRUE(input$fn_italic))
+        }
+        if (!is.null(input$fn_underline)) {
+          update_footnote_font(underline = isTRUE(input$fn_underline))
+        }
+        if (!is.null(input$fn_font_color)) {
+          color <- trimws(input$fn_font_color)
+          if (grepl("^#[0-9A-Fa-f]{6}$", color)) {
+            update_footnote_font(font_color = color)
+          }
+        }
+      }
+
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 1. Create configs modal for uploading & configuring PPTX
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,10 +88,16 @@ pptx_server <- function(id) {
             shiny::uiOutput(ns("filename_label_ui")),
             shiny::uiOutput(ns("configs_options")),
             shiny::uiOutput(ns("footnote_font_ui")),
-            footer = shiny::modalButton("Close")
+            easyClose = FALSE,
+            footer = shiny::actionButton(ns("close_configs"), "Close")
           )
         )
       }
+
+      shiny::observeEvent(input$close_configs, {
+        persist_footnote_font_inputs()
+        shiny::removeModal()
+      })
 
       ## Render filename input with conditional clear button
       output$filename_input_ui <- shiny::renderUI({
