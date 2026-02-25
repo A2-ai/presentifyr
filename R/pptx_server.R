@@ -25,7 +25,15 @@ pptx_server <- function(id) {
         pending_files = NULL,       ## Files pending for preview
         placeholder_count = 1L,     ## Number of placeholders in selected layout
         img_dirs = NULL,            ## Directories for image resource paths
-        file_input_key = 0L         ## Counter to force fileInput re-render on clear
+        file_input_key = 0L,        ## Counter to force fileInput re-render on clear
+        footnote_font = list(       ## Footnote font formatting settings
+          font_name      = "Calibri",
+          font_size      = 8,
+          bold           = FALSE,
+          italic         = FALSE,
+          underline      = FALSE,
+          font_color     = "#000000"
+        )
       )
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -48,6 +56,7 @@ pptx_server <- function(id) {
             shiny::uiOutput(ns("filename_input_ui")),
             shiny::uiOutput(ns("filename_label_ui")),
             shiny::uiOutput(ns("configs_options")),
+            shiny::uiOutput(ns("footnote_font_ui")),
             footer = shiny::modalButton("Close")
           )
         )
@@ -280,6 +289,77 @@ pptx_server <- function(id) {
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      # 2b. Footnote Font Settings (collapsible section in config modal)
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      output$footnote_font_ui <- shiny::renderUI({
+        fs <- rv$footnote_font
+
+        htmltools::tags$details(
+          class = "footnote-font-settings",
+          htmltools::tags$summary("Footnote Font Settings"),
+          htmltools::tags$div(
+            class = "footnote-font-grid",
+            ## Font family
+            shiny::selectInput(
+              ns("fn_font_name"),
+              "Font Family",
+              choices = c("Calibri", "Arial", "Times New Roman", "Helvetica",
+                          "Cambria", "Georgia", "Verdana", "Tahoma",
+                          "Consolas", "Courier New"),
+              selected = fs$font_name
+            ),
+            ## Font size
+            shiny::numericInput(
+              ns("fn_font_size"),
+              "Font Size (pt)",
+              value = fs$font_size,
+              min = 4, max = 72, step = 1
+            ),
+            ## Bold / Italic / Underline toggles in a row
+            htmltools::tags$div(
+              class = "footnote-font-toggles",
+              htmltools::tags$label(class = "control-label", "Style"),
+              htmltools::tags$div(
+                class = "footnote-toggle-row",
+                shiny::checkboxInput(ns("fn_bold"), "Bold", value = fs$bold),
+                shiny::checkboxInput(ns("fn_italic"), "Italic", value = fs$italic),
+                shiny::checkboxInput(ns("fn_underline"), "Underline", value = fs$underline)
+              )
+            ),
+            ## Font color
+            shiny::textInput(
+              ns("fn_font_color"),
+              "Font Color (hex)",
+              value = fs$font_color,
+              placeholder = "#000000"
+            )
+          )
+        )
+      })
+
+      ## Observers for footnote font settings
+      shiny::observeEvent(input$fn_font_name, {
+        rv$footnote_font$font_name <- input$fn_font_name
+      })
+      shiny::observeEvent(input$fn_font_size, {
+        rv$footnote_font$font_size <- input$fn_font_size
+      })
+      shiny::observeEvent(input$fn_bold, {
+        rv$footnote_font$bold <- input$fn_bold
+      })
+      shiny::observeEvent(input$fn_italic, {
+        rv$footnote_font$italic <- input$fn_italic
+      })
+      shiny::observeEvent(input$fn_underline, {
+        rv$footnote_font$underline <- input$fn_underline
+      })
+      shiny::observeEvent(input$fn_font_color, {
+        color <- trimws(input$fn_font_color)
+        if (grepl("^#[0-9A-Fa-f]{6}$", color)) {
+          rv$footnote_font$font_color <- color
+        }
+      })
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 3. Submit template - extract layouts
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$submit_template, {
@@ -431,7 +511,7 @@ pptx_server <- function(id) {
         ))
 
         tryCatch({
-          sync_images(input_pptx, output_pptx)
+          sync_images(input_pptx, output_pptx, font_settings = rv$footnote_font)
 
           rv$processed_file <- output_pptx
 
@@ -998,7 +1078,8 @@ pptx_server <- function(id) {
               slide_layout_name = chosen_layout,
               base_pptx = base_pptx,
               slide_groups = rv$slide_groups,   ## Pass groupings for multi-image
-              slide_positions = rv$slide_positions  ## Pass position preferences
+              slide_positions = rv$slide_positions,  ## Pass position preferences
+              font_settings = rv$footnote_font
             )
 
             file.copy(temp_pptx, file)
