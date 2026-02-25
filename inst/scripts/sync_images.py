@@ -135,6 +135,9 @@ def format_slide_notes(metadata):
     else:
         lines.append("Abbreviations: N/A")
 
+    # Trailing blank line separator
+    lines.append("")
+
     return '\n'.join(lines)
 
 

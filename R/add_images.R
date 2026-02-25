@@ -228,6 +228,8 @@ add_images <- function(files, output_pptx,
           )
           log4r::debug(.le$logger, paste("Added styled footnotes to footer for slide", slide_idx))
         } else {
+          ## Pre-initialize notes slide to avoid inheriting notes master formatting
+          ppt <- officer::set_notes(ppt, value = "", location = officer::notes_location_type("body"))
           ppt <- officer::set_notes(ppt, value = combined_block, location = officer::notes_location_type("body"))
           log4r::debug(.le$logger, paste("Added styled combined notes for slide", slide_idx))
         }

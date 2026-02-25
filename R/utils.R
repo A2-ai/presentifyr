@@ -212,6 +212,9 @@ format_slide_notes <- function(metadata) {
     lines <- c(lines, "Abbreviations: N/A")
   }
 
+  # Trailing blank line separator
+  lines <- c(lines, "")
+
   return(paste(lines, collapse = "\n"))
 }
 
