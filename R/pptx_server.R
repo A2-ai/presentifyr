@@ -511,7 +511,7 @@ pptx_server <- function(id) {
         ))
 
         tryCatch({
-          sync_images(input_pptx, output_pptx, font_settings = rv$footnote_font)
+          sync_images(input_pptx, output_pptx)
 
           rv$processed_file <- output_pptx
 

@@ -12,8 +12,7 @@
 #' )
 #' }
 sync_images <- function(input_pptx,
-                        output_pptx,
-                        font_settings = list()) {
+                        output_pptx) {
   log4r::debug(.le$logger, "Starting sync images R function")
 
   if (!file.exists(input_pptx)) {
@@ -53,14 +52,6 @@ sync_images <- function(input_pptx,
 
   script <- system.file("scripts/sync_images.py", package = "presentifyr")
   args <- c("run", script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict)
-
-  ## Serialize font settings to temp JSON and pass -f flag if non-empty
-  if (length(font_settings) > 0) {
-    temp_font_settings <- tempfile(fileext = ".json")
-    jsonlite::write_json(font_settings, temp_font_settings, auto_unbox = TRUE, pretty = TRUE)
-    args <- c(args, "-f", temp_font_settings)
-    log4r::debug(.le$logger, paste("Font settings written to:", temp_font_settings))
-  }
 
   paths <- reportifyr::get_venv_uv_paths()
   venv_path <- paths$venv
