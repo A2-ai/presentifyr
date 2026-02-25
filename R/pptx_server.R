@@ -292,7 +292,7 @@ pptx_server <- function(id) {
       # 2b. Footnote Font Settings (collapsible section in config modal)
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$footnote_font_ui <- shiny::renderUI({
-        fs <- rv$footnote_font
+        fs <- shiny::isolate(rv$footnote_font)
 
         htmltools::tags$details(
           class = "footnote-font-settings",
