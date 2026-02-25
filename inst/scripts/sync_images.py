@@ -199,77 +199,85 @@ def should_update_notes(slide, new_notes_text, logger):
 def update_text_preserve_formatting(text_frame, new_text):
     """Update text frame content while preserving existing run formatting.
 
-    Splits new_text into lines and maps them onto existing paragraphs.
-    Each paragraph's first run gets updated text; its font properties are
-    preserved.  Extra paragraphs are added (inheriting the last run's
-    formatting) or removed as needed.
+    Uses a capture-clear-rewrite strategy:
+    1. Scan existing paragraphs to capture rPr (run properties) for header
+       lines (starting with '## ') and body lines separately.
+    2. Clear all paragraphs from the text frame.
+    3. Rewrite new lines using the captured formatting.
+
+    This avoids the 1:1 paragraph mapping problem that occurs when lines
+    are added or removed in PowerPoint before sync.
     """
     from copy import deepcopy
     from lxml import etree
+
+    nsmap = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
 
     new_lines = new_text.split('\n')
     # Strip trailing blank lines to match what we display
     while new_lines and new_lines[-1].strip() == '':
         new_lines.pop()
 
-    existing_paras = list(text_frame.paragraphs)
+    # --- Phase 1: Capture formatting from existing paragraphs ---
+    header_rPr = None
+    body_rPr = None
 
-    # Capture formatting from the first run we find (fallback for new paragraphs)
-    ref_rPr = None
-    for p in existing_paras:
-        if p.runs:
-            ref_rPr = deepcopy(p.runs[0]._r.find(
-                '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr'
-            ))
+    for p in text_frame.paragraphs:
+        if not p.runs:
+            continue
+        rPr = p.runs[0]._r.find(f'{nsmap}rPr')
+        if rPr is None:
+            continue
+
+        text = p.runs[0].text or ''
+        if text.startswith('## '):
+            if header_rPr is None:
+                header_rPr = deepcopy(rPr)
+        else:
+            if body_rPr is None:
+                body_rPr = deepcopy(rPr)
+
+        if header_rPr is not None and body_rPr is not None:
             break
 
-    # Update existing paragraphs line-by-line
-    for i, line in enumerate(new_lines):
-        if i < len(existing_paras):
-            p = existing_paras[i]
-            if p.runs:
-                # Update first run's text, preserve its formatting
-                p.runs[0].text = line
-                # Remove extra runs (keep only the first)
-                for run in p.runs[1:]:
-                    p._p.remove(run._r)
-            else:
-                # Paragraph has no runs — add one with reference formatting
-                r_elem = etree.SubElement(
-                    p._p,
-                    '{http://schemas.openxmlformats.org/drawingml/2006/main}r'
-                )
-                if ref_rPr is not None:
-                    r_elem.insert(0, deepcopy(ref_rPr))
-                t_elem = etree.SubElement(
-                    r_elem,
-                    '{http://schemas.openxmlformats.org/drawingml/2006/main}t'
-                )
-                t_elem.text = line
-        else:
-            # Need a new paragraph — add with reference formatting
-            new_p = text_frame.add_paragraph()
-            if ref_rPr is not None:
-                r_elem = etree.SubElement(
-                    new_p._p,
-                    '{http://schemas.openxmlformats.org/drawingml/2006/main}r'
-                )
-                r_elem.insert(0, deepcopy(ref_rPr))
-                t_elem = etree.SubElement(
-                    r_elem,
-                    '{http://schemas.openxmlformats.org/drawingml/2006/main}t'
-                )
-                t_elem.text = line
-            else:
-                new_p.text = line
+    # Fall back: if we only found one type, use it for both
+    if header_rPr is None:
+        header_rPr = deepcopy(body_rPr) if body_rPr is not None else None
+    if body_rPr is None:
+        body_rPr = deepcopy(header_rPr) if header_rPr is not None else None
 
-    # Remove extra paragraphs beyond what we need
+    # Also capture pPr (paragraph properties) from the first paragraph that has one
+    ref_pPr = None
+    for p in text_frame.paragraphs:
+        pPr = p._p.find(f'{nsmap}pPr')
+        if pPr is not None:
+            ref_pPr = deepcopy(pPr)
+            break
+
+    # --- Phase 2: Clear all existing paragraphs ---
     txBody = text_frame._txBody
-    all_paras = txBody.findall(
-        '{http://schemas.openxmlformats.org/drawingml/2006/main}p'
-    )
-    for p_elem in all_paras[len(new_lines):]:
+    for p_elem in txBody.findall(f'{nsmap}p'):
         txBody.remove(p_elem)
+
+    # --- Phase 3: Rewrite with captured formatting ---
+    for i, line in enumerate(new_lines):
+        p_elem = etree.SubElement(txBody, f'{nsmap}p')
+
+        # Apply paragraph properties if we have them
+        if ref_pPr is not None:
+            p_elem.insert(0, deepcopy(ref_pPr))
+
+        # Create the run element
+        r_elem = etree.SubElement(p_elem, f'{nsmap}r')
+
+        # Apply appropriate run formatting
+        rPr = header_rPr if line.startswith('## ') else body_rPr
+        if rPr is not None:
+            r_elem.insert(0, deepcopy(rPr))
+
+        # Set the text
+        t_elem = etree.SubElement(r_elem, f'{nsmap}t')
+        t_elem.text = line
 
 
 def sync_images(input_pptx, output_pptx, image_dict):
