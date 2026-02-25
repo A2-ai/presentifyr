@@ -26,6 +26,7 @@ pptx_server <- function(id) {
         placeholder_count = 1L,     ## Number of placeholders in selected layout
         img_dirs = NULL,            ## Directories for image resource paths
         file_input_key = 0L,        ## Counter to force fileInput re-render on clear
+        config_modal_key = 0L,      ## Counter to refresh modal UI only on open
         footnote_font = list(       ## Footnote font formatting settings
           font_name      = "Calibri",
           font_size      = 8,
@@ -36,6 +37,11 @@ pptx_server <- function(id) {
         )
       )
 
+      update_footnote_font <- function(...) {
+        updates <- list(...)
+        rv$footnote_font <- modifyList(rv$footnote_font, updates)
+      }
+
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 1. Create configs modal for uploading & configuring PPTX
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -45,6 +51,7 @@ pptx_server <- function(id) {
       })
 
       showConfigModal <- function() {
+        rv$config_modal_key <- rv$config_modal_key + 1L
         shiny::showModal(
           shiny::modalDialog(
             title = "Customize PowerPoint Configuration",
@@ -292,6 +299,7 @@ pptx_server <- function(id) {
       # 2b. Footnote Font Settings (collapsible section in config modal)
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$footnote_font_ui <- shiny::renderUI({
+        rv$config_modal_key
         fs <- shiny::isolate(rv$footnote_font)
 
         htmltools::tags$details(
@@ -339,24 +347,24 @@ pptx_server <- function(id) {
 
       ## Observers for footnote font settings
       shiny::observeEvent(input$fn_font_name, {
-        rv$footnote_font$font_name <- input$fn_font_name
+        update_footnote_font(font_name = input$fn_font_name)
       })
       shiny::observeEvent(input$fn_font_size, {
-        rv$footnote_font$font_size <- input$fn_font_size
+        update_footnote_font(font_size = input$fn_font_size)
       })
       shiny::observeEvent(input$fn_bold, {
-        rv$footnote_font$bold <- input$fn_bold
+        update_footnote_font(bold = input$fn_bold)
       })
       shiny::observeEvent(input$fn_italic, {
-        rv$footnote_font$italic <- input$fn_italic
+        update_footnote_font(italic = input$fn_italic)
       })
       shiny::observeEvent(input$fn_underline, {
-        rv$footnote_font$underline <- input$fn_underline
+        update_footnote_font(underline = input$fn_underline)
       })
       shiny::observeEvent(input$fn_font_color, {
         color <- trimws(input$fn_font_color)
         if (grepl("^#[0-9A-Fa-f]{6}$", color)) {
-          rv$footnote_font$font_color <- color
+          update_footnote_font(font_color = color)
         }
       })
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
