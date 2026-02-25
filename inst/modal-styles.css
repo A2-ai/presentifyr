@@ -303,7 +303,8 @@
    Configuration modal form consistency
    ============================================ */
 .modal-body .form-group.shiny-input-container {
-  min-width: 350px;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
 }
 
