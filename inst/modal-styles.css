@@ -611,7 +611,7 @@
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #f1f5f9;
-  text-align: center;
+  text-align: left;
 }
 
 .pptx-layout-preview img {
@@ -625,7 +625,7 @@
 .pptx-layout-preview .layout-caption {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.5rem;
   font-size: 0.9rem;
 }

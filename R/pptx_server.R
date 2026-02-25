@@ -1156,6 +1156,14 @@ pptx_server <- function(id) {
         pptx_details <- NULL
         if (has_filename || has_template) {
           detail_rows <- list()
+          fs <- rv$footnote_font
+          style_flags <- c(
+            if (isTRUE(fs$bold)) "Bold",
+            if (isTRUE(fs$italic)) "Italic",
+            if (isTRUE(fs$underline)) "Underline"
+          )
+          style_text <- if (length(style_flags) > 0) paste(style_flags, collapse = ", ") else "Regular"
+          font_summary <- paste0(fs$font_name, " ", fs$font_size, "pt (", style_text, ", ", fs$font_color, ")")
 
           if (has_filename) {
             display_name <- rv$report_filename
@@ -1183,6 +1191,15 @@ pptx_server <- function(id) {
               )
             ))
           }
+
+          detail_rows <- c(detail_rows, list(
+            htmltools::tags$div(
+              class = "pptx-detail-row",
+              htmltools::tags$span(class = "detail-icon", shiny::icon("font")),
+              htmltools::tags$span(class = "detail-label", "Footnotes"),
+              htmltools::tags$span(class = "detail-value", font_summary)
+            )
+          ))
 
           ## Layout preview
           layout_preview <- NULL
