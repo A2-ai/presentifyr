@@ -196,39 +196,50 @@ def should_update_notes(slide, new_notes_text, logger):
         return True, f"comparison failed ({e})"
 
 
-def split_into_blocks(lines):
-    """Split a list of lines into blocks delimited by '## ' headers.
+def classify_line(text):
+    """Classify a line for block-aware paragraph matching.
 
-    Returns a list of blocks, where each block is a list of lines.
-    The first line of each block is the '## ' header.
+    Returns:
+        tuple: (kind, key)
+            - ("blank", None) for empty lines
+            - ("header", <full header text>) for lines starting with ## 
+            - ("kv", <normalized key>) for Key: value lines
+            - ("text", <normalized text>) for non-empty, non-header, non-key lines
     """
-    blocks = []
-    current = []
-    for line in lines:
-        if line.startswith('## ') and current:
-            blocks.append(current)
-            current = []
-        current.append(line)
-    if current:
-        blocks.append(current)
-    return blocks
+    stripped = (text or "").strip()
+
+    if stripped == "":
+        return "blank", None
+    if stripped.startswith("## "):
+        return "header", stripped
+    if ":" in stripped:
+        key = stripped.split(":", 1)[0].strip().casefold()
+        if key != "":
+            return "kv", key
+    return "text", stripped.casefold()
 
 
-# Expected line count per block: header, Source, Notes, Abbreviations, blank
-BLOCK_SIZE = 5
+def _pick_unmatched(candidates, used_ids):
+    """Return the first unmatched paragraph from a candidate list."""
+    for para in candidates:
+        if id(para) not in used_ids:
+            return para
+    return None
 
 
 def update_text_preserve_formatting(text_frame, new_text):
     """Update text frame content while preserving existing run formatting.
 
-    Uses the known block structure (## header, Source, Notes, Abbreviations,
-    blank) to align existing paragraphs with new lines by index within each
-    block.  Lines present in both old and new get their text updated while
-    keeping the existing rPr.  Lines the user deleted (missing paragraph)
-    are re-inserted with no styling.  Extra paragraphs are removed.
+    Matches old paragraphs to new lines within each image block.
+    - Headers match by exact "## ..." text
+    - Metadata lines match by normalized key before the first colon
+    - Other lines match by normalized full text
+
+    Matched paragraphs get text updated with formatting preserved.
+    Missing lines are inserted unstyled.
     """
-    from copy import deepcopy
     from lxml import etree
+    logger = get_logger()
 
     ns = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
 
@@ -237,50 +248,114 @@ def update_text_preserve_formatting(text_frame, new_text):
         new_lines.pop()
 
     existing_paras = list(text_frame.paragraphs)
-    existing_texts = [(p.text or '').rstrip() for p in existing_paras]
 
-    # Split both sides into blocks by '## ' header
-    new_blocks = split_into_blocks(new_lines)
-    old_blocks = split_into_blocks(existing_texts)
+    # --- Group existing paragraphs into blocks keyed by header text ---
+    # Each block stores:
+    #   - header paragraph
+    #   - paragraphs indexed by normalized key (list to handle duplicates)
+    #   - paragraphs indexed by normalized full text (list fallback)
+    # Also track blank separator paragraphs between blocks
+    old_blocks = {}       # header_text -> block data
+    old_separators = {}   # header_text -> [blank paras before this block]
+    current_header = None
+    current_blanks = []
 
-    # Build a map: block_index -> list of existing paragraph objects
-    old_para_blocks = []
-    idx = 0
-    for block_lines in old_blocks:
-        old_para_blocks.append(existing_paras[idx:idx + len(block_lines)])
-        idx += len(block_lines)
+    for p in existing_paras:
+        text = (p.text or '').rstrip()
+        kind, value = classify_line(text)
 
+        if kind == 'header':
+            # Stash any accumulated blanks as separators for this block
+            if current_header is not None:
+                old_separators[value] = current_blanks
+            current_blanks = []
+            current_header = value
+            old_blocks[current_header] = {
+                'header': p,
+                'by_key': {},
+                'by_text': {}
+            }
+        elif kind == 'blank':
+            current_blanks.append(p)
+        elif current_header is not None:
+            block = old_blocks[current_header]
+            if kind == 'kv':
+                block['by_key'].setdefault(value, []).append(p)
+                if len(block['by_key'][value]) == 2:
+                    logger.warning(
+                        "Duplicate key '%s' found in block '%s'; using first unmatched paragraph.",
+                        value,
+                        current_header
+                    )
+            else:
+                block['by_text'].setdefault(value, []).append(p)
+
+    # --- Group new lines into blocks by header ---
+    new_blocks = []  # list of (header_text, [lines])
+    current_new = []
+    current_new_header = None
+    for line in new_lines:
+        kind, value = classify_line(line)
+        if kind == 'header':
+            if current_new_header is not None:
+                new_blocks.append((current_new_header, current_new))
+            current_new = []
+            current_new_header = value
+        if kind != 'blank':
+            current_new.append(line)
+    if current_new_header is not None:
+        new_blocks.append((current_new_header, current_new))
+
+    # --- Detach all existing paragraphs ---
     txBody = text_frame._txBody
-
-    # Remove all existing <a:p> elements — we'll re-insert them in order
     for p_elem in txBody.findall(f'{ns}p'):
         txBody.remove(p_elem)
 
-    for block_i, new_block in enumerate(new_blocks):
-        # Get the matching old block (by index), if it exists
-        old_paras = old_para_blocks[block_i] if block_i < len(old_para_blocks) else []
+    # --- Rebuild paragraphs in order ---
+    for block_i, (header_text, block_lines) in enumerate(new_blocks):
+        old_block = old_blocks.get(header_text, {})
+        used_ids = set()
 
-        for line_i, new_line in enumerate(new_block):
-            if line_i < len(old_paras):
-                # Existing paragraph at this position — reuse it
-                p = old_paras[line_i]
-                p_elem = p._p
+        # Add blank separator between blocks
+        if block_i > 0:
+            sep_paras = old_separators.get(header_text, [])
+            if sep_paras:
+                for sp in sep_paras:
+                    txBody.append(sp._p)
+            else:
+                # No old separator — create a plain blank paragraph
+                p_elem = etree.SubElement(txBody, f'{ns}p')
 
-                if p.runs:
-                    p.runs[0].text = new_line
-                    # Remove extra runs beyond the first
-                    for run in p.runs[1:]:
+        for new_line in block_lines:
+            kind, value = classify_line(new_line)
+            old_para = None
+
+            if kind == 'header':
+                candidate = old_block.get('header')
+                if candidate is not None and id(candidate) not in used_ids:
+                    old_para = candidate
+            elif kind == 'kv':
+                candidates = old_block.get('by_key', {}).get(value, [])
+                old_para = _pick_unmatched(candidates, used_ids)
+            elif kind == 'text':
+                candidates = old_block.get('by_text', {}).get(value, [])
+                old_para = _pick_unmatched(candidates, used_ids)
+
+            if old_para is not None:
+                # Reuse existing paragraph — update text, keep formatting
+                p_elem = old_para._p
+                if old_para.runs:
+                    old_para.runs[0].text = new_line
+                    for run in old_para.runs[1:]:
                         p_elem.remove(run._r)
                 else:
-                    # Paragraph exists but has no runs — add a plain one
                     r_elem = etree.SubElement(p_elem, f'{ns}r')
                     t_elem = etree.SubElement(r_elem, f'{ns}t')
                     t_elem.text = new_line
-
-                # Re-attach to txBody in correct order
                 txBody.append(p_elem)
+                used_ids.add(id(old_para))
             else:
-                # Missing paragraph (user deleted it) — insert plain, unstyled
+                # Missing (user deleted it) — insert plain, unstyled
                 p_elem = etree.SubElement(txBody, f'{ns}p')
                 r_elem = etree.SubElement(p_elem, f'{ns}r')
                 t_elem = etree.SubElement(r_elem, f'{ns}t')
