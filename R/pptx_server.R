@@ -13,6 +13,14 @@ pptx_server <- function(id) {
     function(input, output, session) {
       log4r::debug(.le$logger, "pptx_server module started")
       ns <- shiny::NS(id)
+      default_footnote_font <- list(
+        font_name      = "Calibri",
+        font_size      = 8,
+        bold           = FALSE,
+        italic         = FALSE,
+        underline      = FALSE,
+        font_color     = "#000000"
+      )
 
       rv <- shiny::reactiveValues(
         uploaded_template = NULL,
@@ -27,14 +35,7 @@ pptx_server <- function(id) {
         img_dirs = NULL,            ## Directories for image resource paths
         file_input_key = 0L,        ## Counter to force fileInput re-render on clear
         config_modal_key = 0L,      ## Counter to refresh modal UI only on open
-        footnote_font = list(       ## Footnote font formatting settings
-          font_name      = "Calibri",
-          font_size      = 8,
-          bold           = FALSE,
-          italic         = FALSE,
-          underline      = FALSE,
-          font_color     = "#000000"
-        )
+        footnote_font = default_footnote_font  ## Footnote font formatting settings
       )
 
       update_footnote_font <- function(...) {
@@ -1137,11 +1138,12 @@ pptx_server <- function(id) {
         ## Check if we have any PowerPoint details to show
         has_filename <- !is.null(rv$report_filename) && nzchar(rv$report_filename)
         has_template <- !is.null(rv$uploaded_template)
+        has_footnote_settings <- !identical(rv$footnote_font, default_footnote_font)
         files <- selected_items()
         has_files <- length(files) > 0
 
         ## Empty state — nothing configured and no files selected
-        if (!has_filename && !has_template && !has_files) {
+        if (!has_filename && !has_template && !has_footnote_settings && !has_files) {
           return(htmltools::tags$div(
             class = "empty-state",
             htmltools::tags$div(class = "empty-state-icon", shiny::icon("sliders")),
@@ -1154,7 +1156,7 @@ pptx_server <- function(id) {
 
         ## PowerPoint details card
         pptx_details <- NULL
-        if (has_filename || has_template) {
+        if (has_filename || has_template || has_footnote_settings) {
           detail_rows <- list()
           fs <- rv$footnote_font
           style_flags <- c(
