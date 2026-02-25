@@ -303,8 +303,9 @@
    Configuration modal form consistency
    ============================================ */
 .modal-body .form-group.shiny-input-container {
-  min-width: 350px;
-  max-width: 450px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Input with clear button */
@@ -610,7 +611,7 @@
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #f1f5f9;
-  text-align: center;
+  text-align: left;
 }
 
 .pptx-layout-preview img {
@@ -624,7 +625,7 @@
 .pptx-layout-preview .layout-caption {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.5rem;
   font-size: 0.9rem;
 }
@@ -747,6 +748,79 @@
   line-height: 1.6;
   max-width: 350px;
   margin: 0 auto;
+}
+
+/* ============================================
+   Footnote Font Settings (collapsible section)
+   ============================================ */
+.footnote-font-settings {
+  margin-top: 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.footnote-font-settings > summary {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.925rem;
+  color: #374151;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.15s ease;
+  border-radius: 8px;
+}
+
+.footnote-font-settings > summary:hover {
+  background: #f8fafc;
+}
+
+.footnote-font-settings > summary::before {
+  content: "\25B6";
+  font-size: 0.7em;
+  transition: transform 0.2s ease;
+}
+
+.footnote-font-settings[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.footnote-font-settings[open] > summary {
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+}
+
+.footnote-font-grid {
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+}
+
+.footnote-font-grid .form-group {
+  margin-bottom: 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.footnote-font-toggles {
+  grid-column: 1 / -1;
+}
+
+.footnote-toggle-row {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.footnote-toggle-row .form-group,
+.footnote-toggle-row .shiny-input-container {
+  margin-bottom: 0;
+  min-width: auto;
+  max-width: none;
 }
 
 /* ============================================

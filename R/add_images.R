@@ -23,7 +23,8 @@
 #' }
 add_images <- function(files, output_pptx,
                        slide_layout_name = NULL, base_pptx = NULL,
-                       slide_groups = NULL, slide_positions = NULL) {
+                       slide_groups = NULL, slide_positions = NULL,
+                       font_settings = list()) {
 
   log4r::debug(.le$logger, "Starting add_images function")
 
@@ -76,6 +77,14 @@ add_images <- function(files, output_pptx,
   log4r::debug(.le$logger, paste("Found", nrow(usable_placeholders_df), "usable placeholder(s):",
                                   paste(usable_placeholders_df$ph_label, collapse = ", ")))
 
+  ## Detect footer placeholder for footnote insertion
+  footer_ph_label <- NULL
+  footer_mask <- grepl("Footer Placeholder", placeholders$ph_label, ignore.case = TRUE)
+  if (any(footer_mask)) {
+    footer_ph_label <- placeholders$ph_label[footer_mask][1]
+    log4r::debug(.le$logger, paste("Footer placeholder detected:", footer_ph_label))
+  }
+
   ## Determine slide groups
   if (is.null(slide_groups)) {
     ## Backward compatibility: one image per slide
@@ -103,9 +112,11 @@ add_images <- function(files, output_pptx,
     ppt <- officer::add_slide(ppt, layout = selected_layout, master = selected_master)
 
     ## Clear non-image placeholders (title, etc.) but keep usable ones for images
+    ## Also preserve footer placeholder if present (used for footnote insertion)
     for (ph_label in placeholders$ph_label) {
       if (!ph_label %in% usable_placeholders_df$ph_label &&
-          !grepl("Slide Number Placeholder", ph_label)) {
+          !grepl("Slide Number Placeholder", ph_label) &&
+          !identical(ph_label, footer_ph_label)) {
         ppt <- officer::ph_with(
           ppt,
           value = "",
@@ -187,16 +198,70 @@ add_images <- function(files, output_pptx,
       }
     }
 
-    ## Combine metadata from all images into slide notes
+    ## Combine metadata from all images into footnote content
     if (length(slide_metadata_list) > 0) {
-      combined_notes <- paste(
-        sapply(names(slide_metadata_list), function(name) {
-          paste0("## ", name, "\n", format_slide_notes(slide_metadata_list[[name]]))
-        }),
-        collapse = "\n\n"
-      )
-      ppt <- officer::set_notes(ppt, value = combined_notes, location = officer::notes_location_type("body"))
-      log4r::debug(.le$logger, paste("Added combined notes for slide", slide_idx))
+      use_styled <- length(font_settings) > 0
+
+      if (use_styled) {
+        ## Build a single block_list from all images' styled notes
+        all_blocks <- list()
+        image_names <- names(slide_metadata_list)
+        for (i in seq_along(image_names)) {
+          name <- image_names[i]
+
+          ## Blank separator line between image blocks
+          if (i > 1) {
+            all_blocks <- c(all_blocks, list(officer::fpar()))
+          }
+
+          header_fp <- officer::fp_text(
+            font.size   = font_settings$font_size %||% 8,
+            font.family = font_settings$font_name %||% "Calibri",
+            bold        = TRUE,
+            color       = font_settings$font_color %||% "#000000"
+          )
+          all_blocks <- c(all_blocks, list(
+            officer::fpar(officer::ftext(paste0("## ", name), prop = header_fp))
+          ))
+          styled <- format_slide_notes_styled(slide_metadata_list[[name]], font_settings)
+          all_blocks <- c(all_blocks, as.list(styled))
+        }
+        combined_block <- do.call(officer::block_list, all_blocks)
+
+        if (!is.null(footer_ph_label)) {
+          ppt <- officer::ph_with(
+            ppt,
+            value = combined_block,
+            location = officer::ph_location_label(ph_label = footer_ph_label)
+          )
+          log4r::debug(.le$logger, paste("Added styled footnotes to footer for slide", slide_idx))
+        } else {
+          ## Pre-initialize notes slide to avoid inheriting notes master formatting
+          ppt <- officer::set_notes(ppt, value = "", location = officer::notes_location_type("body"))
+          ppt <- officer::set_notes(ppt, value = combined_block, location = officer::notes_location_type("body"))
+          log4r::debug(.le$logger, paste("Added styled combined notes for slide", slide_idx))
+        }
+      } else {
+        ## Plain text path (default, unchanged behavior)
+        combined_notes <- paste(
+          sapply(names(slide_metadata_list), function(name) {
+            paste0("## ", name, "\n", format_slide_notes(slide_metadata_list[[name]]))
+          }),
+          collapse = "\n\n"
+        )
+
+        if (!is.null(footer_ph_label)) {
+          ppt <- officer::ph_with(
+            ppt,
+            value = combined_notes,
+            location = officer::ph_location_label(ph_label = footer_ph_label)
+          )
+          log4r::debug(.le$logger, paste("Added footnotes to footer for slide", slide_idx))
+        } else {
+          ppt <- officer::set_notes(ppt, value = combined_notes, location = officer::notes_location_type("body"))
+          log4r::debug(.le$logger, paste("Added combined notes for slide", slide_idx))
+        }
+      }
     }
   }
   print(ppt, target = output_pptx)

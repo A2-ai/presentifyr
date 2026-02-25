@@ -13,6 +13,14 @@ pptx_server <- function(id) {
     function(input, output, session) {
       log4r::debug(.le$logger, "pptx_server module started")
       ns <- shiny::NS(id)
+      default_footnote_font <- list(
+        font_name      = "Calibri",
+        font_size      = 8,
+        bold           = FALSE,
+        italic         = FALSE,
+        underline      = FALSE,
+        font_color     = "#000000"
+      )
 
       rv <- shiny::reactiveValues(
         uploaded_template = NULL,
@@ -25,8 +33,39 @@ pptx_server <- function(id) {
         pending_files = NULL,       ## Files pending for preview
         placeholder_count = 1L,     ## Number of placeholders in selected layout
         img_dirs = NULL,            ## Directories for image resource paths
-        file_input_key = 0L         ## Counter to force fileInput re-render on clear
+        file_input_key = 0L,        ## Counter to force fileInput re-render on clear
+        config_modal_key = 0L,      ## Counter to refresh modal UI only on open
+        footnote_font = default_footnote_font  ## Footnote font formatting settings
       )
+
+      update_footnote_font <- function(...) {
+        updates <- list(...)
+        rv$footnote_font <- modifyList(rv$footnote_font, updates)
+      }
+
+      persist_footnote_font_inputs <- function() {
+        if (!is.null(input$fn_font_name) && nzchar(input$fn_font_name)) {
+          update_footnote_font(font_name = input$fn_font_name)
+        }
+        if (!is.null(input$fn_font_size) && is.numeric(input$fn_font_size)) {
+          update_footnote_font(font_size = input$fn_font_size)
+        }
+        if (!is.null(input$fn_bold)) {
+          update_footnote_font(bold = isTRUE(input$fn_bold))
+        }
+        if (!is.null(input$fn_italic)) {
+          update_footnote_font(italic = isTRUE(input$fn_italic))
+        }
+        if (!is.null(input$fn_underline)) {
+          update_footnote_font(underline = isTRUE(input$fn_underline))
+        }
+        if (!is.null(input$fn_font_color)) {
+          color <- trimws(input$fn_font_color)
+          if (grepl("^#[0-9A-Fa-f]{6}$", color)) {
+            update_footnote_font(font_color = color)
+          }
+        }
+      }
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 1. Create configs modal for uploading & configuring PPTX
@@ -37,6 +76,8 @@ pptx_server <- function(id) {
       })
 
       showConfigModal <- function() {
+        rv$config_modal_key <- rv$config_modal_key + 1L
+        fs <- shiny::isolate(rv$footnote_font)
         shiny::showModal(
           shiny::modalDialog(
             title = "Customize PowerPoint Configuration",
@@ -48,10 +89,27 @@ pptx_server <- function(id) {
             shiny::uiOutput(ns("filename_input_ui")),
             shiny::uiOutput(ns("filename_label_ui")),
             shiny::uiOutput(ns("configs_options")),
-            footer = shiny::modalButton("Close")
+            shiny::uiOutput(ns("footnote_font_ui")),
+            easyClose = FALSE,
+            footer = shiny::actionButton(ns("close_configs"), "Close")
           )
         )
+
+        ## Push saved state into controls after modal UI is mounted.
+        shiny::onFlushed(function() {
+          shiny::updateSelectInput(session, "fn_font_name", selected = fs$font_name)
+          shiny::updateNumericInput(session, "fn_font_size", value = fs$font_size)
+          shiny::updateCheckboxInput(session, "fn_bold", value = isTRUE(fs$bold))
+          shiny::updateCheckboxInput(session, "fn_italic", value = isTRUE(fs$italic))
+          shiny::updateCheckboxInput(session, "fn_underline", value = isTRUE(fs$underline))
+          shiny::updateTextInput(session, "fn_font_color", value = fs$font_color)
+        }, once = TRUE)
       }
+
+      shiny::observeEvent(input$close_configs, {
+        persist_footnote_font_inputs()
+        shiny::removeModal()
+      })
 
       ## Render filename input with conditional clear button
       output$filename_input_ui <- shiny::renderUI({
@@ -280,6 +338,56 @@ pptx_server <- function(id) {
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      # 2b. Footnote Font Settings (collapsible section in config modal)
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      output$footnote_font_ui <- shiny::renderUI({
+        rv$config_modal_key
+        fs <- shiny::isolate(rv$footnote_font)
+
+        htmltools::tags$details(
+          class = "footnote-font-settings",
+          htmltools::tags$summary("Footnote Font Settings"),
+          htmltools::tags$div(
+            class = "footnote-font-grid",
+            ## Font family
+            shiny::selectInput(
+              ns("fn_font_name"),
+              "Font Family",
+              choices = c("Calibri", "Arial", "Times New Roman", "Helvetica",
+                          "Cambria", "Georgia", "Verdana", "Tahoma",
+                          "Consolas", "Courier New"),
+              selected = fs$font_name
+            ),
+            ## Font size
+            shiny::numericInput(
+              ns("fn_font_size"),
+              "Font Size (pt)",
+              value = fs$font_size,
+              min = 4, max = 72, step = 1
+            ),
+            ## Bold / Italic / Underline toggles in a row
+            htmltools::tags$div(
+              class = "footnote-font-toggles",
+              htmltools::tags$label(class = "control-label", "Style"),
+              htmltools::tags$div(
+                class = "footnote-toggle-row",
+                shiny::checkboxInput(ns("fn_bold"), "Bold", value = fs$bold),
+                shiny::checkboxInput(ns("fn_italic"), "Italic", value = fs$italic),
+                shiny::checkboxInput(ns("fn_underline"), "Underline", value = fs$underline)
+              )
+            ),
+            ## Font color
+            shiny::textInput(
+              ns("fn_font_color"),
+              "Font Color (hex)",
+              value = fs$font_color,
+              placeholder = "#000000"
+            )
+          )
+        )
+      })
+
+      #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 3. Submit template - extract layouts
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$submit_template, {
@@ -299,7 +407,11 @@ pptx_server <- function(id) {
         base_pptx <- rv$uploaded_template$datapath
         log4r::debug(.le$logger, paste0("Template uploaded: ", base_pptx))
 
-        output_dir <- tempdir()
+        output_dir <- file.path(tempdir(), "prfy_layouts")
+        dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+        ## Clean old layout files before extracting new ones
+        old_files <- list.files(output_dir, full.names = TRUE)
+        if (length(old_files) > 0) unlink(old_files, force = TRUE)
         log4r::debug(.le$logger, paste0("Temporary output directory: ", output_dir))
 
         tryCatch({
@@ -343,14 +455,10 @@ pptx_server <- function(id) {
           log4r::info(.le$logger, "Template file removed")
         }
 
-        old_layout_files <- list.files(
-          tempdir(),
-          pattern = "\\.png$",
-          full.names = TRUE
-        )
-        if (length(old_layout_files) > 0) {
-          unlink(old_layout_files, force = TRUE)
-          log4r::debug(.le$logger, paste("Removed old layout PNGs:", paste(old_layout_files, collapse = ", ")))
+        layout_dir <- file.path(tempdir(), "prfy_layouts")
+        if (dir.exists(layout_dir)) {
+          unlink(layout_dir, recursive = TRUE, force = TRUE)
+          log4r::debug(.le$logger, paste("Removed layout directory:", layout_dir))
         }
 
         shiny::removeResourcePath("pptx_layouts")
@@ -998,7 +1106,8 @@ pptx_server <- function(id) {
               slide_layout_name = chosen_layout,
               base_pptx = base_pptx,
               slide_groups = rv$slide_groups,   ## Pass groupings for multi-image
-              slide_positions = rv$slide_positions  ## Pass position preferences
+              slide_positions = rv$slide_positions,  ## Pass position preferences
+              font_settings = rv$footnote_font
             )
 
             file.copy(temp_pptx, file)
@@ -1029,11 +1138,12 @@ pptx_server <- function(id) {
         ## Check if we have any PowerPoint details to show
         has_filename <- !is.null(rv$report_filename) && nzchar(rv$report_filename)
         has_template <- !is.null(rv$uploaded_template)
+        has_footnote_settings <- !identical(rv$footnote_font, default_footnote_font)
         files <- selected_items()
         has_files <- length(files) > 0
 
         ## Empty state — nothing configured and no files selected
-        if (!has_filename && !has_template && !has_files) {
+        if (!has_filename && !has_template && !has_footnote_settings && !has_files) {
           return(htmltools::tags$div(
             class = "empty-state",
             htmltools::tags$div(class = "empty-state-icon", shiny::icon("sliders")),
@@ -1046,8 +1156,16 @@ pptx_server <- function(id) {
 
         ## PowerPoint details card
         pptx_details <- NULL
-        if (has_filename || has_template) {
+        if (has_filename || has_template || has_footnote_settings) {
           detail_rows <- list()
+          fs <- rv$footnote_font
+          style_flags <- c(
+            if (isTRUE(fs$bold)) "Bold",
+            if (isTRUE(fs$italic)) "Italic",
+            if (isTRUE(fs$underline)) "Underline"
+          )
+          style_text <- if (length(style_flags) > 0) paste(style_flags, collapse = ", ") else "Regular"
+          font_summary <- paste0(fs$font_name, " ", fs$font_size, "pt (", style_text, ", ", fs$font_color, ")")
 
           if (has_filename) {
             display_name <- rv$report_filename
@@ -1075,6 +1193,15 @@ pptx_server <- function(id) {
               )
             ))
           }
+
+          detail_rows <- c(detail_rows, list(
+            htmltools::tags$div(
+              class = "pptx-detail-row",
+              htmltools::tags$span(class = "detail-icon", shiny::icon("font")),
+              htmltools::tags$span(class = "detail-label", "Footnotes"),
+              htmltools::tags$span(class = "detail-value", font_summary)
+            )
+          ))
 
           ## Layout preview
           layout_preview <- NULL
@@ -1176,14 +1303,10 @@ pptx_server <- function(id) {
       # 8. Session close + clear layouts
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       session$onSessionEnded(function() {
-        old_layout_files <- list.files(
-          tempdir(),
-          pattern = "\\.png$",
-          full.names = TRUE
-        )
-        if (length(old_layout_files) > 0) {
-          unlink(old_layout_files, force = TRUE)
-          log4r::info(.le$logger, paste("Session ended, removed layout PNGs:", paste(old_layout_files, collapse = ", ")))
+        layout_dir <- file.path(tempdir(), "prfy_layouts")
+        if (dir.exists(layout_dir)) {
+          unlink(layout_dir, recursive = TRUE, force = TRUE)
+          log4r::info(.le$logger, paste("Session ended, removed layout directory:", layout_dir))
         }
 
         if ("pptx_layouts" %in% names(shiny::resourcePaths())) {
