@@ -76,6 +76,7 @@ pptx_server <- function(id) {
 
       showConfigModal <- function() {
         rv$config_modal_key <- rv$config_modal_key + 1L
+        fs <- shiny::isolate(rv$footnote_font)
         shiny::showModal(
           shiny::modalDialog(
             title = "Customize PowerPoint Configuration",
@@ -92,6 +93,16 @@ pptx_server <- function(id) {
             footer = shiny::actionButton(ns("close_configs"), "Close")
           )
         )
+
+        ## Push saved state into controls after modal UI is mounted.
+        shiny::onFlushed(function() {
+          shiny::updateSelectInput(session, "fn_font_name", selected = fs$font_name)
+          shiny::updateNumericInput(session, "fn_font_size", value = fs$font_size)
+          shiny::updateCheckboxInput(session, "fn_bold", value = isTRUE(fs$bold))
+          shiny::updateCheckboxInput(session, "fn_italic", value = isTRUE(fs$italic))
+          shiny::updateCheckboxInput(session, "fn_underline", value = isTRUE(fs$underline))
+          shiny::updateTextInput(session, "fn_font_color", value = fs$font_color)
+        }, once = TRUE)
       }
 
       shiny::observeEvent(input$close_configs, {
@@ -375,28 +386,6 @@ pptx_server <- function(id) {
         )
       })
 
-      ## Observers for footnote font settings
-      shiny::observeEvent(input$fn_font_name, {
-        update_footnote_font(font_name = input$fn_font_name)
-      })
-      shiny::observeEvent(input$fn_font_size, {
-        update_footnote_font(font_size = input$fn_font_size)
-      })
-      shiny::observeEvent(input$fn_bold, {
-        update_footnote_font(bold = input$fn_bold)
-      })
-      shiny::observeEvent(input$fn_italic, {
-        update_footnote_font(italic = input$fn_italic)
-      })
-      shiny::observeEvent(input$fn_underline, {
-        update_footnote_font(underline = input$fn_underline)
-      })
-      shiny::observeEvent(input$fn_font_color, {
-        color <- trimws(input$fn_font_color)
-        if (grepl("^#[0-9A-Fa-f]{6}$", color)) {
-          update_footnote_font(font_color = color)
-        }
-      })
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 3. Submit template - extract layouts
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
