@@ -304,7 +304,7 @@
    ============================================ */
 .modal-body .form-group.shiny-input-container {
   min-width: 350px;
-  max-width: 450px;
+  max-width: 100%;
 }
 
 /* Input with clear button */
