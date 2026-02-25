@@ -139,12 +139,30 @@ def format_slide_notes(metadata):
     return '\n'.join(lines)
 
 
+def normalize_text_for_comparison(text):
+    """Normalize text for hash comparison.
+
+    Strips trailing whitespace from each line and trailing blank lines,
+    so officer-created styled content (which may have extra empty paragraphs)
+    matches the Python-generated text.
+    """
+    lines = text.split('\n')
+    # Strip trailing whitespace per line
+    lines = [line.rstrip() for line in lines]
+    # Strip trailing blank lines
+    while lines and lines[-1] == '':
+        lines.pop()
+    return '\n'.join(lines)
+
+
 def should_update_footer(footer_shape, new_text, logger):
     """Determine if footer text should be updated based on hash comparison."""
     try:
-        existing_text = footer_shape.text or ""
+        existing_text = normalize_text_for_comparison(footer_shape.text or "")
+        new_normalized = normalize_text_for_comparison(new_text)
+
         existing_hash = compute_text_hash(existing_text)
-        new_hash = compute_text_hash(new_text)
+        new_hash = compute_text_hash(new_normalized)
 
         if existing_hash == new_hash:
             return False, "unchanged (hashes match)"
@@ -163,9 +181,11 @@ def should_update_notes(slide, new_notes_text, logger):
         if text_frame is None:
             return True, "no existing notes"
 
-        existing_text = text_frame.text or ""
+        existing_text = normalize_text_for_comparison(text_frame.text or "")
+        new_normalized = normalize_text_for_comparison(new_notes_text)
+
         existing_hash = compute_text_hash(existing_text)
-        new_hash = compute_text_hash(new_notes_text)
+        new_hash = compute_text_hash(new_normalized)
 
         if existing_hash == new_hash:
             return False, "unchanged (hashes match)"
@@ -174,6 +194,82 @@ def should_update_notes(slide, new_notes_text, logger):
     except Exception as e:
         logger.warning(f"Could not compare notes: {e}. Will update.")
         return True, f"comparison failed ({e})"
+
+
+def update_text_preserve_formatting(text_frame, new_text):
+    """Update text frame content while preserving existing run formatting.
+
+    Splits new_text into lines and maps them onto existing paragraphs.
+    Each paragraph's first run gets updated text; its font properties are
+    preserved.  Extra paragraphs are added (inheriting the last run's
+    formatting) or removed as needed.
+    """
+    from copy import deepcopy
+    from lxml import etree
+
+    new_lines = new_text.split('\n')
+    # Strip trailing blank lines to match what we display
+    while new_lines and new_lines[-1].strip() == '':
+        new_lines.pop()
+
+    existing_paras = list(text_frame.paragraphs)
+
+    # Capture formatting from the first run we find (fallback for new paragraphs)
+    ref_rPr = None
+    for p in existing_paras:
+        if p.runs:
+            ref_rPr = deepcopy(p.runs[0]._r.find(
+                '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr'
+            ))
+            break
+
+    # Update existing paragraphs line-by-line
+    for i, line in enumerate(new_lines):
+        if i < len(existing_paras):
+            p = existing_paras[i]
+            if p.runs:
+                # Update first run's text, preserve its formatting
+                p.runs[0].text = line
+                # Remove extra runs (keep only the first)
+                for run in p.runs[1:]:
+                    p._p.remove(run._r)
+            else:
+                # Paragraph has no runs — add one with reference formatting
+                r_elem = etree.SubElement(
+                    p._p,
+                    '{http://schemas.openxmlformats.org/drawingml/2006/main}r'
+                )
+                if ref_rPr is not None:
+                    r_elem.insert(0, deepcopy(ref_rPr))
+                t_elem = etree.SubElement(
+                    r_elem,
+                    '{http://schemas.openxmlformats.org/drawingml/2006/main}t'
+                )
+                t_elem.text = line
+        else:
+            # Need a new paragraph — add with reference formatting
+            new_p = text_frame.add_paragraph()
+            if ref_rPr is not None:
+                r_elem = etree.SubElement(
+                    new_p._p,
+                    '{http://schemas.openxmlformats.org/drawingml/2006/main}r'
+                )
+                r_elem.insert(0, deepcopy(ref_rPr))
+                t_elem = etree.SubElement(
+                    r_elem,
+                    '{http://schemas.openxmlformats.org/drawingml/2006/main}t'
+                )
+                t_elem.text = line
+            else:
+                new_p.text = line
+
+    # Remove extra paragraphs beyond what we need
+    txBody = text_frame._txBody
+    all_paras = txBody.findall(
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}p'
+    )
+    for p_elem in all_paras[len(new_lines):]:
+        txBody.remove(p_elem)
 
 
 def sync_images(input_pptx, output_pptx, image_dict):
@@ -282,7 +378,7 @@ def sync_images(input_pptx, output_pptx, image_dict):
                     should_update, reason = should_update_footer(footer_shape, combined_notes, logger)
                     if should_update:
                         try:
-                            footer_shape.text = combined_notes
+                            update_text_preserve_formatting(footer_shape.text_frame, combined_notes)
                             logger.info(f"Slide {slide_index}: Updated footer ({reason})")
                             stats['footer_updated'] += 1
                         except Exception as e:
@@ -298,7 +394,7 @@ def sync_images(input_pptx, output_pptx, image_dict):
                             notes_slide = slide.notes_slide
                             text_frame = notes_slide.notes_text_frame
                             if text_frame is not None:
-                                text_frame.text = combined_notes
+                                update_text_preserve_formatting(text_frame, combined_notes)
                                 logger.info(f"Slide {slide_index}: Updated notes ({reason})")
                                 stats['notes_updated'] += 1
                             else:
