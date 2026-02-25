@@ -205,7 +205,15 @@ add_images <- function(files, output_pptx,
       if (use_styled) {
         ## Build a single block_list from all images' styled notes
         all_blocks <- list()
-        for (name in names(slide_metadata_list)) {
+        image_names <- names(slide_metadata_list)
+        for (i in seq_along(image_names)) {
+          name <- image_names[i]
+
+          ## Blank separator line between image blocks
+          if (i > 1) {
+            all_blocks <- c(all_blocks, list(officer::fpar()))
+          }
+
           header_fp <- officer::fp_text(
             font.size   = font_settings$font_size %||% 8,
             font.family = font_settings$font_name %||% "Calibri",
