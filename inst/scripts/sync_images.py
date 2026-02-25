@@ -196,88 +196,95 @@ def should_update_notes(slide, new_notes_text, logger):
         return True, f"comparison failed ({e})"
 
 
+def split_into_blocks(lines):
+    """Split a list of lines into blocks delimited by '## ' headers.
+
+    Returns a list of blocks, where each block is a list of lines.
+    The first line of each block is the '## ' header.
+    """
+    blocks = []
+    current = []
+    for line in lines:
+        if line.startswith('## ') and current:
+            blocks.append(current)
+            current = []
+        current.append(line)
+    if current:
+        blocks.append(current)
+    return blocks
+
+
+# Expected line count per block: header, Source, Notes, Abbreviations, blank
+BLOCK_SIZE = 5
+
+
 def update_text_preserve_formatting(text_frame, new_text):
     """Update text frame content while preserving existing run formatting.
 
-    Uses a capture-clear-rewrite strategy:
-    1. Scan existing paragraphs to capture rPr (run properties) for header
-       lines (starting with '## ') and body lines separately.
-    2. Clear all paragraphs from the text frame.
-    3. Rewrite new lines using the captured formatting.
-
-    This avoids the 1:1 paragraph mapping problem that occurs when lines
-    are added or removed in PowerPoint before sync.
+    Uses the known block structure (## header, Source, Notes, Abbreviations,
+    blank) to align existing paragraphs with new lines by index within each
+    block.  Lines present in both old and new get their text updated while
+    keeping the existing rPr.  Lines the user deleted (missing paragraph)
+    are re-inserted with no styling.  Extra paragraphs are removed.
     """
     from copy import deepcopy
     from lxml import etree
 
-    nsmap = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+    ns = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
 
     new_lines = new_text.split('\n')
-    # Strip trailing blank lines to match what we display
     while new_lines and new_lines[-1].strip() == '':
         new_lines.pop()
 
-    # --- Phase 1: Capture formatting from existing paragraphs ---
-    header_rPr = None
-    body_rPr = None
+    existing_paras = list(text_frame.paragraphs)
+    existing_texts = [(p.text or '').rstrip() for p in existing_paras]
 
-    for p in text_frame.paragraphs:
-        if not p.runs:
-            continue
-        rPr = p.runs[0]._r.find(f'{nsmap}rPr')
-        if rPr is None:
-            continue
+    # Split both sides into blocks by '## ' header
+    new_blocks = split_into_blocks(new_lines)
+    old_blocks = split_into_blocks(existing_texts)
 
-        text = p.runs[0].text or ''
-        if text.startswith('## '):
-            if header_rPr is None:
-                header_rPr = deepcopy(rPr)
-        else:
-            if body_rPr is None:
-                body_rPr = deepcopy(rPr)
+    # Build a map: block_index -> list of existing paragraph objects
+    old_para_blocks = []
+    idx = 0
+    for block_lines in old_blocks:
+        old_para_blocks.append(existing_paras[idx:idx + len(block_lines)])
+        idx += len(block_lines)
 
-        if header_rPr is not None and body_rPr is not None:
-            break
-
-    # Fall back: if we only found one type, use it for both
-    if header_rPr is None:
-        header_rPr = deepcopy(body_rPr) if body_rPr is not None else None
-    if body_rPr is None:
-        body_rPr = deepcopy(header_rPr) if header_rPr is not None else None
-
-    # Also capture pPr (paragraph properties) from the first paragraph that has one
-    ref_pPr = None
-    for p in text_frame.paragraphs:
-        pPr = p._p.find(f'{nsmap}pPr')
-        if pPr is not None:
-            ref_pPr = deepcopy(pPr)
-            break
-
-    # --- Phase 2: Clear all existing paragraphs ---
     txBody = text_frame._txBody
-    for p_elem in txBody.findall(f'{nsmap}p'):
+
+    # Remove all existing <a:p> elements — we'll re-insert them in order
+    for p_elem in txBody.findall(f'{ns}p'):
         txBody.remove(p_elem)
 
-    # --- Phase 3: Rewrite with captured formatting ---
-    for i, line in enumerate(new_lines):
-        p_elem = etree.SubElement(txBody, f'{nsmap}p')
+    for block_i, new_block in enumerate(new_blocks):
+        # Get the matching old block (by index), if it exists
+        old_paras = old_para_blocks[block_i] if block_i < len(old_para_blocks) else []
 
-        # Apply paragraph properties if we have them
-        if ref_pPr is not None:
-            p_elem.insert(0, deepcopy(ref_pPr))
+        for line_i, new_line in enumerate(new_block):
+            if line_i < len(old_paras):
+                # Existing paragraph at this position — reuse it
+                p = old_paras[line_i]
+                p_elem = p._p
 
-        # Create the run element
-        r_elem = etree.SubElement(p_elem, f'{nsmap}r')
+                if p.runs:
+                    p.runs[0].text = new_line
+                    # Remove extra runs beyond the first
+                    for run in p.runs[1:]:
+                        p_elem.remove(run._r)
+                else:
+                    # Paragraph exists but has no runs — add a plain one
+                    r_elem = etree.SubElement(p_elem, f'{ns}r')
+                    t_elem = etree.SubElement(r_elem, f'{ns}t')
+                    t_elem.text = new_line
 
-        # Apply appropriate run formatting
-        rPr = header_rPr if line.startswith('## ') else body_rPr
-        if rPr is not None:
-            r_elem.insert(0, deepcopy(rPr))
-
-        # Set the text
-        t_elem = etree.SubElement(r_elem, f'{nsmap}t')
-        t_elem.text = line
+                # Re-attach to txBody in correct order
+                txBody.append(p_elem)
+            else:
+                # Missing paragraph (user deleted it) — insert plain, unstyled
+                p_elem = etree.SubElement(txBody, f'{ns}p')
+                r_elem = etree.SubElement(p_elem, f'{ns}r')
+                t_elem = etree.SubElement(r_elem, f'{ns}t')
+                t_elem.text = new_line
 
 
 def sync_images(input_pptx, output_pptx, image_dict):
