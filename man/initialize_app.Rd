@@ -8,6 +8,7 @@ initialize_app(
   project_dir = get_project_dir(),
   report_dir_name = NULL,
   outputs_dir_name = NULL,
+  install_python_deps = TRUE,
   verbose = TRUE
 )
 }
@@ -20,6 +21,9 @@ Must already exist. Default is \code{get_project_dir()}.}
 
 \item{outputs_dir_name}{The directory name for artifacts. Default is \code{NULL}
 (uses reportifyr default).}
+
+\item{install_python_deps}{Logical. Whether to install Python dependencies.
+Default is \code{TRUE}.}
 
 \item{verbose}{Logical. Print detailed initialization messages.
 Default is \code{TRUE}.}
@@ -40,5 +44,8 @@ dependencies) and python-pptx installation.
 \examples{
 \dontrun{
 initialize_app()
+
+# Skip Python dependencies
+initialize_app(install_python_deps = FALSE)
 }
 }
