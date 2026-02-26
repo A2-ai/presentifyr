@@ -80,16 +80,18 @@ def get_usable_placeholders(layout):
 
 
 def clear_non_image_placeholders(slide, usable_indices):
-    """Clear title and other non-image placeholders, preserving footer and slide number.
+    """Clear text in non-image placeholders, preserving footer and slide number.
 
-    Mirrors add_images.R:116-126.
+    Mirrors add_images.R:116-126.  The R code uses officer::ph_with(value = "")
+    which blanks the placeholder text but keeps the element in the slide XML.
+    Removing the element entirely would strip template formatting/decorations.
     """
     logger = get_logger()
     for shape in list(slide.placeholders):
         idx = shape.placeholder_format.idx
         if idx not in usable_indices and idx not in PRESERVE_PLACEHOLDER_INDICES:
-            sp = shape._element
-            sp.getparent().remove(sp)
+            if shape.has_text_frame:
+                shape.text_frame.clear()
             logger.debug(f"Cleared placeholder idx={idx}")
 
 
