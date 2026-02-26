@@ -59,7 +59,7 @@ add_images <- function(files, output_pptx,
   )
 
   temp_config <- tempfile(fileext = ".json")
-  jsonlite::write_json(config, temp_config, auto_unbox = TRUE, pretty = TRUE)
+  jsonlite::write_json(config, temp_config, auto_unbox = TRUE, pretty = TRUE, null = "null")
   log4r::debug(.le$logger, paste("Config JSON written to:", temp_config))
 
   script <- system.file("scripts/add_images.py", package = "presentifyr")

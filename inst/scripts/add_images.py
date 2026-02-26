@@ -38,7 +38,7 @@ def find_layout_by_name(prs, name):
     """
     logger = get_logger()
 
-    if name is None:
+    if not name or not isinstance(name, str):
         ## Default to index 1 (second layout, matching officer default)
         layout = prs.slide_layouts[1]
         logger.debug(f"No layout name specified, using default layout: {layout.name}")
