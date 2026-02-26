@@ -10,7 +10,8 @@ add_images(
   slide_layout_name = NULL,
   base_pptx = NULL,
   slide_groups = NULL,
-  slide_positions = NULL
+  slide_positions = NULL,
+  font_settings = list()
 )
 }
 \arguments{

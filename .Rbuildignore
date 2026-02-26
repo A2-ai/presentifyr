@@ -10,6 +10,9 @@
 ^Meta$
 
 ^rv$
-^rproject.toml$
-^rv\.toml$
+^rproject\.toml$
+^rv\.lock$
 ^\.Rprofile$
+
+^\.vscode$
+^\.claude$

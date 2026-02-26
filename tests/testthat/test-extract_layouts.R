@@ -84,6 +84,7 @@ test_that("extract_layouts correctly parses layout indices from filenames", {
   expected_df <- data.frame(
     layout_name = layout_names,
     image_path = layout_images,
+    placeholder_count = NA_integer_,
     stringsAsFactors = FALSE
   )
 

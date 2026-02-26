@@ -8,7 +8,6 @@ test_that("add_images fails if invalid layout name is specified", {
   expect_error(
     add_images(
       files = img,
-      repo_url = "https://example.com/repo",
       output_pptx = output_pptx,
       slide_layout_name = "NonExistentLayout",
       base_pptx = NULL
@@ -49,11 +48,10 @@ test_that("add_images fails if no content placeholder 2 is found", {
   expect_error(
     add_images(
       files = img,
-      repo_url = "https://example.com/repo",
       output_pptx = output_pptx,
       base_pptx = NULL
     ),
-    "No content placeholder found"
+    "No usable placeholder found"
   )
 })
 
@@ -67,11 +65,10 @@ test_that("add_images fails if magick cannot read the image", {
   expect_error(
     add_images(
       files = c(fake_img),
-      repo_url = "https://example.com/repo",
-      output_pptx = out_pptx,
+      output_pptx = output_pptx,
       slide_layout_name = NULL,
       base_pptx = NULL
     ),
-    regexp = "improper image header"
+    regexp = "ImproperImageHeader"
   )
 })
