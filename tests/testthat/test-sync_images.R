@@ -76,10 +76,7 @@ test_that("sync_images uses relative keys when under project root and falls back
   file.create(input_pptx)
   output_pptx <- tempfile(fileext = ".pptx")
 
-  mockery::stub(sync_images, "getOption", function(x, default) {
-    if (identical(x, "project.dir")) return(root)
-    base::getOption(x, default = default)
-  })
+  mockery::stub(sync_images, "get_project_dir", function() root)
   mockery::stub(sync_images, "reportifyr::get_venv_uv_paths", function() {
     list(uv = "/mock/uv", venv = "/mock/venv")
   })
@@ -91,9 +88,10 @@ test_that("sync_images uses relative keys when under project root and falls back
   sync_images(input_pptx, output_pptx)
 
   written_json <- jsonlite::read_json(temp_json_file)
+  # in-root image gets a relative key
   expect_true("figs/plot.png" %in% names(written_json))
-  # outside root should be skipped/unsupported; ensure only the in-root key is present
-  expect_equal(names(written_json), "figs/plot.png")
+  # outside-root image falls back to basename key
+  expect_true(basename(img_outside) %in% names(written_json))
 })
 
 test_that("sync_images fails when virtual environment does not exist", {

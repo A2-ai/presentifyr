@@ -54,7 +54,7 @@ prfy_image_key <- function(file_path, root = get_project_dir()) {
 
   key <- if (!is.na(rel) && !startsWith(rel, "..")) rel else basename(file_path)
   # Normalize separators for portability
-  gsub("\\\\", "/", key)
+  as.character(gsub("\\\\", "/", key))
 }
 
 #' Creates a vector of available image file paths
