@@ -79,6 +79,31 @@ def get_usable_placeholders(layout):
     return placeholders
 
 
+def clone_missing_placeholders(slide, layout):
+    """Clone all layout placeholders missing from the slide.
+
+    python-pptx's add_slide() only clones a subset of placeholders (title,
+    body, content, picture) to the new slide. Other placeholders like footer
+    (idx=11), date (idx=10), and slide number (idx=12) are inherited visually
+    from the layout/master but have no actual XML element on the slide.
+    PowerPoint's own "Insert Slide" clones all of them. This function does
+    the same so the slide matches what a user would get from the UI.
+    """
+    from copy import deepcopy
+    logger = get_logger()
+
+    existing_indices = {
+        shape.placeholder_format.idx for shape in slide.placeholders
+    }
+
+    for shape in layout.placeholders:
+        idx = shape.placeholder_format.idx
+        if idx not in existing_indices:
+            sp_clone = deepcopy(shape._element)
+            slide.shapes._spTree.append(sp_clone)
+            logger.debug(f"Cloned placeholder idx={idx} ({shape.name}) from layout to slide")
+
+
 def clear_non_image_placeholders(slide, usable_indices):
     """Clear text in non-image placeholders, preserving footer and slide number.
 
@@ -318,6 +343,10 @@ def add_images(output_pptx, config, base_pptx=None):
         logger.debug(f"Creating slide {slide_idx} of {len(slide_groups)} with {len(slide_files)} image(s)")
 
         slide = prs.slides.add_slide(layout)
+
+        ## Clone any layout placeholders that add_slide() didn't copy,
+        ## so the slide matches what PowerPoint's own "Insert Slide" produces
+        clone_missing_placeholders(slide, layout)
 
         ## Clear non-image placeholders (title, etc.) but keep usable + footer + slidenum
         clear_non_image_placeholders(slide, usable_indices)
