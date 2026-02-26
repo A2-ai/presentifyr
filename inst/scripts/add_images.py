@@ -100,6 +100,8 @@ def place_image_in_placeholder(slide, image_path, ph_info, alt_text):
     then adjusts dimensions for scale-to-fit + center (matching the R/officer
     behavior from add_images.R:154-191).
     """
+    from pptx.shapes.placeholder import PicturePlaceholder
+
     logger = get_logger()
 
     ph_idx = ph_info['idx']
@@ -112,6 +114,12 @@ def place_image_in_placeholder(slide, image_path, ph_info, alt_text):
     ph_top = ph.top
     ph_width = ph.width
     ph_height = ph.height
+
+    ## Content placeholders (type 7) are generic SlidePlaceholder objects
+    ## that lack insert_picture(). Cast to PicturePlaceholder to get the method.
+    ## Type 18 (Picture) placeholders already have it natively.
+    if not hasattr(ph, 'insert_picture'):
+        ph = PicturePlaceholder(ph._element, ph._parent)
 
     ## Insert picture INTO the placeholder (properly consumes it)
     pic = ph.insert_picture(image_path)
