@@ -69,6 +69,6 @@ test_that("add_images fails if magick cannot read the image", {
       slide_layout_name = NULL,
       base_pptx = NULL
     ),
-    regexp = "ImproperImageHeader"
+    regexp = "[Ii]mproper.?[Ii]mage.?[Hh]eader"
   )
 })

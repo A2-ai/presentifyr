@@ -1,3 +1,6 @@
+#' @importFrom rlang %||%
+NULL
+
 .onLoad <- function(...) {
   shiny::addResourcePath("presentifyr", system.file(".", package = "presentifyr"))
   options(shiny.maxRequestSize = 50000*1024^2)

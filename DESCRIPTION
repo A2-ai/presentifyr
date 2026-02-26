@@ -31,6 +31,7 @@ Imports:
     officer,
     pkglite (>= 0.2.2),
     processx (>= 3.8.4),
+    rlang,
     shiny (>= 1.8.1.1),
     stats
 Suggests:
