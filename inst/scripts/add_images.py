@@ -2,7 +2,6 @@ import os
 import argparse
 import json
 from pptx import Presentation
-from pptx.util import Emu
 from PIL import Image
 from py_logger import get_logger
 from pptx_utils import (
@@ -95,49 +94,61 @@ def clear_non_image_placeholders(slide, usable_indices):
 
 
 def place_image_in_placeholder(slide, image_path, ph_info, alt_text):
-    """Scale image to fit and center within placeholder bounds.
+    """Insert image into placeholder, scale to fit, and center within bounds.
 
-    Mirrors add_images.R:154-191.
-    Image placement math:
-    - Read pixel dimensions via Pillow
-    - Convert to inches at 300 DPI
-    - Scale factor: min(ph_width / raw_w, ph_height / raw_h)
-    - Center: left = ph_left + (ph_width - final_w) / 2
+    Uses placeholder.insert_picture() so the placeholder is properly consumed,
+    then adjusts dimensions for scale-to-fit + center (matching the R/officer
+    behavior from add_images.R:154-191).
     """
     logger = get_logger()
 
-    raw_w, raw_h = get_image_dimensions_inches(image_path)
+    ph_idx = ph_info['idx']
 
-    ph_left = ph_info['left']
-    ph_top = ph_info['top']
-    ph_width = ph_info['width']
-    ph_height = ph_info['height']
+    ## Access the actual placeholder on the slide
+    ph = slide.placeholders[ph_idx]
 
-    ## Convert placeholder EMU dimensions to inches for scaling calculation
-    ph_width_in = ph_width / EMU_PER_INCH
-    ph_height_in = ph_height / EMU_PER_INCH
+    ## Store original placeholder bounds before insertion
+    ph_left = ph.left
+    ph_top = ph.top
+    ph_width = ph.width
+    ph_height = ph.height
 
-    scale_factor = min(ph_width_in / raw_w, ph_height_in / raw_h)
-    final_w_in = raw_w * scale_factor
-    final_h_in = raw_h * scale_factor
+    ## Insert picture INTO the placeholder (properly consumes it)
+    pic = ph.insert_picture(image_path)
 
-    logger.debug(f"Scaled image size: {final_w_in:.2f} x {final_h_in:.2f} inches")
+    ## Reset any auto-cropping applied by insert_picture's fill behavior
+    pic.crop_top = 0
+    pic.crop_left = 0
+    pic.crop_bottom = 0
+    pic.crop_right = 0
 
-    ## Center within placeholder (compute in inches, then convert to EMU)
-    centered_left_in = (ph_left / EMU_PER_INCH) + (ph_width_in - final_w_in) / 2
-    centered_top_in = (ph_top / EMU_PER_INCH) + (ph_height_in - final_h_in) / 2
+    ## Calculate scale-to-fit using image aspect ratio
+    with Image.open(image_path) as img:
+        img_w_px, img_h_px = img.size
 
-    left_emu = Emu(int(round(centered_left_in * EMU_PER_INCH)))
-    top_emu = Emu(int(round(centered_top_in * EMU_PER_INCH)))
-    width_emu = Emu(int(round(final_w_in * EMU_PER_INCH)))
-    height_emu = Emu(int(round(final_h_in * EMU_PER_INCH)))
+    img_aspect = img_w_px / img_h_px
+    ph_aspect = ph_width / ph_height
 
-    pic = slide.shapes.add_picture(image_path, left_emu, top_emu, width_emu, height_emu)
+    if img_aspect > ph_aspect:
+        ## Image is wider relative to placeholder — constrained by width
+        final_w = ph_width
+        final_h = int(round(ph_width / img_aspect))
+    else:
+        ## Image is taller relative to placeholder — constrained by height
+        final_h = ph_height
+        final_w = int(round(ph_height * img_aspect))
+
+    ## Center within original placeholder bounds
+    pic.left = ph_left + (ph_width - final_w) // 2
+    pic.top = ph_top + (ph_height - final_h) // 2
+    pic.width = final_w
+    pic.height = final_h
 
     ## Set alt-text using {prfy}:<key> pattern
     pic._element.nvPicPr.cNvPr.set("descr", alt_text)
 
-    logger.debug(f"Placed image at ({centered_left_in:.2f}, {centered_top_in:.2f})")
+    logger.debug(f"Placed image in placeholder idx={ph_idx}, "
+                 f"size: {final_w / EMU_PER_INCH:.2f} x {final_h / EMU_PER_INCH:.2f} inches")
 
 
 def set_slide_notes_plain(slide, text):
