@@ -383,8 +383,12 @@ pptx_server <- function(id) {
               value = fs$font_color
             ),
             htmltools::tags$script(htmltools::HTML(sprintf(
-              "document.getElementById('%s').type = 'color';",
-              ns("fn_font_color")
+              "var el = document.getElementById('%s');
+               el.type = 'color';
+               el.addEventListener('input', function() {
+                 Shiny.setInputValue('%s', el.value);
+               });",
+              ns("fn_font_color"), ns("fn_font_color")
             )))
           )
         )
