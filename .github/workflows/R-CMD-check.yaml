@@ -51,7 +51,7 @@ jobs:
       - name: replace-rversion (Windows)
         run: |
           $rVersion = "${{ matrix.config.r }}"
-          (Get-Content rproject.toml) -replace '^r_version = "4\.[0-9\.]+", "r_version = `"$rVersion`"" | Set-Content rproject.toml
+          (Get-Content rproject.toml) -replace '^r_version = "4\.[0-9\.]+"$', "r_version = `"$rVersion`"" | Set-Content rproject.toml
           Get-Content rproject.toml
         shell: pwsh
         if: runner.os == 'Windows'
