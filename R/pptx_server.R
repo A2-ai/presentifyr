@@ -379,10 +379,13 @@ pptx_server <- function(id) {
             ## Font color
             shiny::textInput(
               ns("fn_font_color"),
-              "Font Color (hex)",
-              value = fs$font_color,
-              placeholder = "#000000"
-            )
+              "Font Color",
+              value = fs$font_color
+            ),
+            htmltools::tags$script(htmltools::HTML(sprintf(
+              "document.getElementById('%s').type = 'color';",
+              ns("fn_font_color")
+            )))
           )
         )
       })
