@@ -288,6 +288,12 @@ def add_images(output_pptx, config, base_pptx=None):
     logger.info(f"Total slides to create: {len(slide_groups)}")
 
     for slide_idx, (slide_files, slide_pos) in enumerate(zip(slide_groups, slide_positions), start=1):
+        ## auto_unbox in R serializes single-element vectors as scalars;
+        ## normalize back to lists so zip() works uniformly
+        if isinstance(slide_files, str):
+            slide_files = [slide_files]
+        if isinstance(slide_pos, (int, float)):
+            slide_pos = [slide_pos]
         logger.debug(f"Creating slide {slide_idx} of {len(slide_groups)} with {len(slide_files)} image(s)")
 
         slide = prs.slides.add_slide(layout)
