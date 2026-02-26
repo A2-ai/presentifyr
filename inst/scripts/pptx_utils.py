@@ -17,9 +17,11 @@ def find_footer_placeholder(slide):
     """Find the footer placeholder on a slide, if it exists.
 
     Footer placeholders have placeholder index 11 in the PowerPoint spec.
+    Only returns shapes that have a text_frame (guards against placeholders
+    that were converted to PlaceholderPicture by insert_picture).
     """
     for shape in slide.placeholders:
-        if shape.placeholder_format.idx == 11:
+        if shape.placeholder_format.idx == 11 and shape.has_text_frame:
             return shape
     return None
 
