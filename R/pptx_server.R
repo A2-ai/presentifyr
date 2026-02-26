@@ -40,7 +40,7 @@ pptx_server <- function(id) {
 
       update_footnote_font <- function(...) {
         updates <- list(...)
-        rv$footnote_font <- modifyList(rv$footnote_font, updates)
+        rv$footnote_font <- utils::modifyList(rv$footnote_font, updates)
       }
 
       persist_footnote_font_inputs <- function() {
