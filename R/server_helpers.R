@@ -69,18 +69,6 @@ split_before_index <- function(groups, positions, global_idx) {
   list(groups = new_groups, positions = new_positions)
 }
 
-#' Merge a slide with the next slide
-#'
-#' Combines the images from `slide_idx` and `slide_idx + 1` into a single
-#' slide. Positions are reset to sequential for the merged slide.
-#'
-#' @param groups List of character vectors (current slide groupings).
-#' @param positions List of integer vectors (current slide positions).
-#' @param slide_idx Integer, the 1-based index of the slide to merge with next.
-#'
-#' @return A list with `groups` and `positions`.
-#' @keywords internal
-#' @noRd
 #' Distribute files across slides based on placeholder count
 #'
 #' Creates the initial slide grouping by distributing files evenly across
