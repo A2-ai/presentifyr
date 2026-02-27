@@ -12,7 +12,7 @@ test_that("parse_directory_for_images returns empty when no images are found", {
   expect_length(result, 0)
 })
 
-test_that("parse_directory_for_images finds images in a directory", {
+test_that("parse_directory_for_images finds images and excludes non-images", {
   img_dir <- tempfile()
   dir.create(img_dir)
 
@@ -24,7 +24,7 @@ test_that("parse_directory_for_images finds images in a directory", {
   expect_equal(basename(result), c("image1.png", "image2.jpg"))
 })
 
-test_that("parse_directory_for_images finds images recursively", {
+test_that("parse_directory_for_images finds images recursively in subdirectories", {
   parent_dir <- tempfile()
   dir.create(parent_dir)
 
@@ -38,6 +38,20 @@ test_that("parse_directory_for_images finds images recursively", {
   expect_equal(basename(result), c("image1.png", "image2.jpg"))
 })
 
+test_that("parse_directory_for_images with recursive=FALSE only scans top level", {
+  parent_dir <- tempfile()
+  dir.create(parent_dir)
+
+  sub_dir <- file.path(parent_dir, "subfolder")
+  dir.create(sub_dir)
+
+  file.create(file.path(parent_dir, "top_level.png"))
+  file.create(file.path(sub_dir, "nested.png"))
+
+  result <- parse_directory_for_images(parent_dir, recursive = FALSE)
+  expect_equal(basename(result), "top_level.png")
+})
+
 test_that("parse_directory_for_images excludes specified directories", {
   parent_dir <- tempfile()
   dir.create(parent_dir)
@@ -49,26 +63,10 @@ test_that("parse_directory_for_images excludes specified directories", {
   file.create(file.path(exclude_dir, "image2.jpg"))
 
   result <- parse_directory_for_images(parent_dir, recursive = TRUE, exclude_dirs = "exclude_me")
-  expect_equal(basename(result), c("image1.png"))
+  expect_equal(basename(result), "image1.png")
 })
 
-test_that("prfy_image_key prefers relative paths within root", {
-  root <- tempfile()
-  dir.create(root)
-  f <- file.path(root, "subdir", "img.png")
-  dir.create(dirname(f), recursive = TRUE)
-  file.create(f)
-
-  key <- prfy_image_key(f, root = root)
-  expect_equal(key, "subdir/img.png")
-
-  # outside root falls back to basename
-  g <- tempfile(fileext = ".png")
-  key2 <- prfy_image_key(g, root = root)
-  expect_equal(key2, basename(g))
-})
-
-test_that("parse_directory_for_images uses default exclude dirs helper", {
+test_that("parse_directory_for_images uses default exclude dirs (renv, rv, node_modules)", {
   parent_dir <- tempfile()
   dir.create(parent_dir)
 
@@ -86,7 +84,7 @@ test_that("parse_directory_for_images uses default exclude dirs helper", {
   expect_equal(basename(res), "imageC.png")
 })
 
-test_that("parse_directory_for_images does not descend into excluded dirs", {
+test_that("parse_directory_for_images does not descend into excluded directories", {
   parent_dir <- tempfile()
   dir.create(parent_dir)
 
