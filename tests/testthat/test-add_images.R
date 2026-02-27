@@ -1,74 +1,153 @@
-test_that("add_images fails if invalid layout name is specified", {
-  tmp_dir <- tempdir()
-  output_pptx <- file.path(tmp_dir, "bad_layout.pptx")
+test_that("add_images fails when Python script execution fails", {
+  output_pptx <- tempfile(fileext = ".pptx")
 
-  img <- file.path(tmp_dir, "dummy.png")
-  magick::image_write(magick::image_blank(100, 100, "blue"), img)
+  mockery::stub(add_images, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/path/to/uv", venv = "/mock/venv")
+  })
 
-  expect_error(
-    add_images(
-      files = img,
-      output_pptx = output_pptx,
-      slide_layout_name = "NonExistentLayout",
-      base_pptx = NULL
-    ),
-    regexp = "not found in template"
-  )
-})
-
-test_that("add_images fails if no content placeholder 2 is found", {
-  tmp_dir <- tempdir()
-  output_pptx <- file.path(tmp_dir, "mocked_layout_test.pptx")
-
-  img <- file.path(tmp_dir, "dummy.png")
-  magick::image_write(magick::image_blank(100, 100, "blue"), img)
-
-  mock_layout_properties <- function(doc, layout) {
-    data.frame(
-      master_name = c("FAKE MASTER","FAKE MASTER"),
-      name        = c(layout, layout),
-      type        = c("sldNum","title"),
-      id          = c("6","2"),
-      ph_label    = c("Slide Number Placeholder 5","Title 1"),
-      ph          = c("<p:ph type=\"sldNum\" sz=\"quarter\" idx=\"12\"/>",
-                      "<p:ph type=\"title\"/>"),
-      offx        = c(9.4166667, 0.9166667),
-      offy        = c(6.9513911, 0.3993077),
-      cx          = c(3, 11.5),
-      cy          = c(0.3993056, 1.4496533),
-      rotation    = c(NA_real_, NA_real_),
-      fld_id      = c("{C7AF375C-9754-4EA2-97C9-0ABC2B16F434}", NA),
-      fld_type    = c("slidenum", NA),
-      stringsAsFactors = FALSE
-    )
+  mock_run_fail <- function(...) {
+    e <- simpleError("Python script execution failed")
+    e$status <- 1
+    e$stdout <- ""
+    e$stderr <- "Python script error occurred"
+    stop(e)
   }
-
-  mockery::stub(add_images, "officer::layout_properties", mock_layout_properties)
+  mockery::stub(add_images, "processx::run", mock_run_fail)
 
   expect_error(
     add_images(
-      files = img,
+      files = c("/path/to/image1.png"),
       output_pptx = output_pptx,
       base_pptx = NULL
     ),
-    "No usable placeholder found"
+    "Add images script failed. Status:  1 Stderr:  Python script error occurred"
   )
 })
 
-test_that("add_images fails if magick cannot read the image", {
-  tmp_dir <- tempdir()
-  output_pptx <- file.path(tmp_dir, "unreadable_image.pptx")
+test_that("add_images correctly creates config JSON with slide groups and positions", {
+  output_pptx <- tempfile(fileext = ".pptx")
 
-  fake_img <- file.path(tmp_dir, "image.png")
-  file.create(fake_img)
+  mockery::stub(add_images, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/uv", venv = "/mock/venv")
+  })
+  mockery::stub(add_images, "processx::run", function(...) {
+    list(stdout = "Python script executed successfully", stderr = "", status = 0)
+  })
+
+  temp_config_file <- NULL
+  mockery::stub(add_images, "tempfile", function(fileext = ".json") {
+    temp_config_file <<- tempfile(fileext = fileext)
+    return(temp_config_file)
+  })
+
+  add_images(
+    files = c("/path/to/img1.png", "/path/to/img2.png"),
+    output_pptx = output_pptx,
+    slide_layout_name = "Two Content",
+    slide_groups = list(c("/path/to/img1.png", "/path/to/img2.png")),
+    slide_positions = list(c(1L, 2L)),
+    font_settings = list(font_name = "Arial", font_size = 10)
+  )
+
+  config <- jsonlite::read_json(temp_config_file)
+
+  expect_equal(config$slide_layout_name, "Two Content")
+  expect_equal(config$slide_groups, list(list("/path/to/img1.png", "/path/to/img2.png")))
+  expect_equal(config$slide_positions, list(list(1L, 2L)))
+  expect_equal(config$font_settings$font_name, "Arial")
+  expect_equal(config$font_settings$font_size, 10)
+  expect_true("image_keys" %in% names(config))
+})
+
+test_that("add_images forwards base_pptx argument to Python script", {
+  output_pptx <- tempfile(fileext = ".pptx")
+  base_pptx <- tempfile(fileext = ".pptx")
+  file.create(base_pptx)
+
+  captured_args <- NULL
+  mockery::stub(add_images, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/uv", venv = "/mock/venv")
+  })
+  mockery::stub(add_images, "processx::run", function(command, args, ...) {
+    captured_args <<- args
+    list(stdout = "", stderr = "", status = 0)
+  })
+
+  add_images(
+    files = c("/path/to/image.png"),
+    output_pptx = output_pptx,
+    base_pptx = base_pptx
+  )
+
+  expect_true("-b" %in% captured_args)
+  expect_true(base_pptx %in% captured_args)
+})
+
+test_that("add_images does not include -b flag when base_pptx is NULL", {
+  output_pptx <- tempfile(fileext = ".pptx")
+
+  captured_args <- NULL
+  mockery::stub(add_images, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/uv", venv = "/mock/venv")
+  })
+  mockery::stub(add_images, "processx::run", function(command, args, ...) {
+    captured_args <<- args
+    list(stdout = "", stderr = "", status = 0)
+  })
+
+  add_images(
+    files = c("/path/to/image.png"),
+    output_pptx = output_pptx,
+    base_pptx = NULL
+  )
+
+  expect_false("-b" %in% captured_args)
+})
+
+test_that("add_images fails when virtual environment does not exist", {
+  output_pptx <- tempfile(fileext = ".pptx")
+
+  mockery::stub(add_images, "reportifyr::get_venv_uv_paths", function() {
+    stop("Create virtual environment with initialize_python")
+  })
 
   expect_error(
     add_images(
-      files = c(fake_img),
-      output_pptx = output_pptx,
-      slide_layout_name = NULL,
-      base_pptx = NULL
+      files = c("/path/to/image.png"),
+      output_pptx = output_pptx
     ),
-    regexp = "ImproperImageHeader"
+    "Create virtual environment"
   )
+})
+
+test_that("add_images uses single-image mode when slide_groups is NULL", {
+  output_pptx <- tempfile(fileext = ".pptx")
+
+  temp_config_file <- NULL
+  mockery::stub(add_images, "reportifyr::get_venv_uv_paths", function() {
+    list(uv = "/mock/uv", venv = "/mock/venv")
+  })
+  mockery::stub(add_images, "processx::run", function(...) {
+    list(stdout = "", stderr = "", status = 0)
+  })
+  mockery::stub(add_images, "tempfile", function(fileext = ".json") {
+    temp_config_file <<- tempfile(fileext = fileext)
+    return(temp_config_file)
+  })
+
+  add_images(
+    files = c("/path/to/img1.png", "/path/to/img2.png"),
+    output_pptx = output_pptx
+  )
+
+  config <- jsonlite::read_json(temp_config_file)
+
+  ## Single-image mode: each file becomes its own slide group
+  expect_equal(length(config$slide_groups), 2)
+  ## Single-element vectors are auto-unboxed to scalars by write_json(auto_unbox=TRUE),
+  ## so read_json returns them as length-1 character/integer vectors, not lists.
+  expect_equal(config$slide_groups[[1]], "/path/to/img1.png")
+  expect_equal(config$slide_groups[[2]], "/path/to/img2.png")
+  expect_equal(config$slide_positions[[1]], 1L)
+  expect_equal(config$slide_positions[[2]], 1L)
 })

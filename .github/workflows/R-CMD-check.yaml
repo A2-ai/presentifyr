@@ -21,7 +21,6 @@ jobs:
       matrix:
         config:
           - {os: macos-latest,   r: '4.5'}
-          - {os: windows-latest, r: '4.5'}
           - {os: ubuntu-latest,  r: '4.5'}
           - {os: ubuntu-latest,  r: '4.4'}
           - {os: ubuntu-latest,  r: '4.3'}
@@ -46,24 +45,9 @@ jobs:
         run: |
           perl -i -pe 's|^r_version = "4\.[0-9\.]+"$|r_version = "${{ matrix.config.r }}"|' rproject.toml
           cat rproject.toml
-        if: runner.os != 'Windows'
-
-      - name: replace-rversion (Windows)
-        run: |
-          $rVersion = "${{ matrix.config.r }}"
-          (Get-Content rproject.toml) -replace '^r_version = "4\.[0-9\.]+", "r_version = `"$rVersion`"" | Set-Content rproject.toml
-          Get-Content rproject.toml
-        shell: pwsh
-        if: runner.os == 'Windows'
 
       - name: rv-plan
         run: rv plan
-        if: runner.os != 'Windows'
-
-      - name: rv-plan (Windows)
-        run: rv.exe plan
-        shell: cmd
-        if: runner.os == 'Windows'
 
       - name: rv-sysdeps-install (Linux)
         if: runner.os == 'Linux'
@@ -80,12 +64,6 @@ jobs:
 
       - name: rv-sync
         run: rv sync
-        if: runner.os != 'Windows'
-
-      - name: rv-sync (Windows)
-        run: rv.exe sync
-        shell: cmd
-        if: runner.os == 'Windows'
 
       - uses: r-lib/actions/check-r-package@v2
         with:

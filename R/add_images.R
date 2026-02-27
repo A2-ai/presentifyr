@@ -28,64 +28,7 @@ add_images <- function(files, output_pptx,
 
   log4r::debug(.le$logger, "Starting add_images function")
 
-  if (!is.null(base_pptx) && file.exists(base_pptx)) {
-    log4r::info(.le$logger, paste("Using base PowerPoint template:", base_pptx))
-    ppt <- officer::read_pptx(base_pptx)
-  } else {
-    log4r::warn(.le$logger, "No valid PowerPoint template found. Creating a blank presentation.")
-    ppt <- officer::read_pptx()
-  }
-
-  layouts <- officer::layout_summary(ppt)
-  log4r::debug(.le$logger, paste("Available layouts:", paste(layouts$layout, collapse = ", ")))
-
-  if (!is.null(slide_layout_name)) {
-    log4r::debug(.le$logger, paste("Name of slide layout being used:", slide_layout_name))
-    normalized_layout_name <- trimws(tolower(gsub("_", " ", slide_layout_name)))
-    normalized_layouts <- trimws(tolower(gsub("_", " ", layouts$layout)))
-    matched_index <- match(normalized_layout_name, normalized_layouts)
-
-    if (is.na(matched_index)) {
-      log4r::error(.le$logger, paste("Invalid layout name: ", slide_layout_name))
-      stop("Invalid layout name '", slide_layout_name, "' not found in template.")
-    }
-    slide_layout_index <- matched_index
-  } else {
-    slide_layout_index <- 2 ## Default for officer::read_pptx() as of 0.6.6
-  }
-
-  selected_layout <- layouts$layout[slide_layout_index]
-  selected_master <- layouts$master[slide_layout_index]
-  log4r::debug(.le$logger, paste("Selected layout:", selected_layout, "on master:", selected_master))
-
-  placeholders <- officer::layout_properties(ppt, selected_layout)
-
-  ## Match Content Placeholder or Picture Placeholder labels
-  usable_ph_mask <- grepl("Content Placeholder|Picture Placeholder", placeholders$ph_label)
-  usable_placeholders_df <- placeholders[usable_ph_mask, ]
-
-  if (nrow(usable_placeholders_df) == 0) {
-    log4r::error(.le$logger, paste("No usable placeholder found (Content or Picture)"))
-    stop("No usable placeholder found (Content Placeholder or Picture Placeholder)")
-  }
-
-  ## Sort placeholders by position: top-to-bottom, then left-to-right
-  usable_placeholders_df <- usable_placeholders_df[
-    order(usable_placeholders_df$offy, usable_placeholders_df$offx),
-  ]
-
-  log4r::debug(.le$logger, paste("Found", nrow(usable_placeholders_df), "usable placeholder(s):",
-                                  paste(usable_placeholders_df$ph_label, collapse = ", ")))
-
-  ## Detect footer placeholder for footnote insertion
-  footer_ph_label <- NULL
-  footer_mask <- grepl("Footer Placeholder", placeholders$ph_label, ignore.case = TRUE)
-  if (any(footer_mask)) {
-    footer_ph_label <- placeholders$ph_label[footer_mask][1]
-    log4r::debug(.le$logger, paste("Footer placeholder detected:", footer_ph_label))
-  }
-
-  ## Determine slide groups
+  ## Determine slide groups (backward compat logic stays in R)
   if (is.null(slide_groups)) {
     ## Backward compatibility: one image per slide
     slide_groups <- as.list(files)
@@ -99,172 +42,54 @@ add_images <- function(files, output_pptx,
     log4r::debug(.le$logger, paste("Using grouped mode:", length(slide_groups), "slides"))
   }
 
-  log4r::info(.le$logger, paste("Total slides to create:", length(slide_groups)))
+  ## Pre-compute image keys via prfy_image_key()
+  all_files <- unique(unlist(slide_groups))
+  image_keys <- stats::setNames(
+    vapply(all_files, prfy_image_key, character(1)),
+    all_files
+  )
 
-  for (slide_idx in seq_along(slide_groups)) {
-    slide_files <- slide_groups[[slide_idx]]
-    slide_pos <- slide_positions[[slide_idx]]
-    if (!is.character(slide_files)) slide_files <- as.character(slide_files)
+  ## Build config for Python script
+  config <- list(
+    slide_layout_name = slide_layout_name,
+    slide_groups = slide_groups,
+    slide_positions = slide_positions,
+    font_settings = font_settings,
+    image_keys = as.list(image_keys)
+  )
 
-    log4r::debug(.le$logger, paste("Creating slide", slide_idx, "of", length(slide_groups),
-                                   "with", length(slide_files), "image(s)"))
+  temp_config <- tempfile(fileext = ".json")
+  jsonlite::write_json(config, temp_config, auto_unbox = TRUE, pretty = TRUE, null = "null")
+  log4r::debug(.le$logger, paste("Config JSON written to:", temp_config))
 
-    ppt <- officer::add_slide(ppt, layout = selected_layout, master = selected_master)
+  script <- system.file("scripts/add_images.py", package = "presentifyr")
+  args <- c("run", script, "-o", output_pptx, "-c", temp_config)
 
-    ## Clear non-image placeholders (title, etc.) but keep usable ones for images
-    ## Also preserve footer placeholder if present (used for footnote insertion)
-    for (ph_label in placeholders$ph_label) {
-      if (!ph_label %in% usable_placeholders_df$ph_label &&
-          !grepl("Slide Number Placeholder", ph_label) &&
-          !identical(ph_label, footer_ph_label)) {
-        ppt <- officer::ph_with(
-          ppt,
-          value = "",
-          location = officer::ph_location_label(ph_label = ph_label)
-        )
-      }
-    }
-
-    ## Collect metadata from all images on this slide for combined notes
-    slide_metadata_list <- list()
-
-    ## Place each image in corresponding placeholder
-    for (img_idx in seq_along(slide_files)) {
-      file <- slide_files[img_idx]
-
-      ## Get placeholder for this image based on specified position
-      target_pos <- slide_pos[img_idx]
-      ## Clamp to valid range
-      ph_row_idx <- min(max(target_pos, 1), nrow(usable_placeholders_df))
-      ph_info <- usable_placeholders_df[ph_row_idx, ]
-
-      ph_left   <- ph_info$offx
-      ph_top    <- ph_info$offy
-      ph_width  <- ph_info$cx
-      ph_height <- ph_info$cy
-
-      log4r::debug(.le$logger, paste("Placing image", img_idx, "in placeholder:", ph_info$ph_label))
-      log4r::debug(.le$logger, paste("Placeholder bounding box:",
-                                     "left=", ph_left, "top=", ph_top,
-                                     "width=", ph_width, "height=", ph_height))
-
-      alt_text_key <- prfy_image_key(file)
-      alt_text <- paste0("{prfy}:", alt_text_key)
-
-      img <- tryCatch({
-        magick::image_read(file)
-      }, error = function(e) {
-        log4r::error(.le$logger, paste("Error reading file:", file, "-", e$message))
-        stop(e)
-      })
-
-      info <- magick::image_info(img)
-      width_px  <- info$width
-      height_px <- info$height
-
-      x_res <- 300 ## DPI used by PowerPoint auto-scaling
-      y_res <- 300 ## DPI used by PowerPoint auto-scaling
-
-      raw_width_in  <- width_px  / x_res
-      raw_height_in <- height_px / y_res
-
-      scale_factor <- min(ph_width / raw_width_in, ph_height / raw_height_in)
-      final_w <- raw_width_in  * scale_factor
-      final_h <- raw_height_in * scale_factor
-
-      log4r::debug(.le$logger, paste("Scaled image size:",
-                                     round(final_w, 2), "x", round(final_h, 2), "inches"))
-
-      centered_left <- ph_left + (ph_width  - final_w) / 2
-      centered_top  <- ph_top  + (ph_height - final_h) / 2
-
-      ppt <- officer::ph_with(
-        ppt,
-        value = officer::external_img(file, width = final_w, height = final_h, alt = alt_text),
-        location = officer::ph_location(
-          left   = centered_left,
-          top    = centered_top,
-          width  = final_w,
-          height = final_h
-        ),
-        use_loc_size = FALSE
-      )
-      log4r::debug(.le$logger, paste("Image inserted for slide", slide_idx))
-
-      ## Collect metadata for this image
-      metadata <- load_image_metadata(file)
-      if (!is.null(metadata)) {
-        slide_metadata_list[[basename(file)]] <- metadata
-      }
-    }
-
-    ## Combine metadata from all images into footnote content
-    if (length(slide_metadata_list) > 0) {
-      use_styled <- length(font_settings) > 0
-
-      if (use_styled) {
-        ## Build a single block_list from all images' styled notes
-        all_blocks <- list()
-        image_names <- names(slide_metadata_list)
-        for (i in seq_along(image_names)) {
-          name <- image_names[i]
-
-          ## Blank separator line between image blocks
-          if (i > 1) {
-            all_blocks <- c(all_blocks, list(officer::fpar()))
-          }
-
-          header_fp <- officer::fp_text(
-            font.size   = font_settings$font_size %||% 8,
-            font.family = font_settings$font_name %||% "Calibri",
-            bold        = TRUE,
-            color       = font_settings$font_color %||% "#000000"
-          )
-          all_blocks <- c(all_blocks, list(
-            officer::fpar(officer::ftext(paste0("## ", name), prop = header_fp))
-          ))
-          styled <- format_slide_notes_styled(slide_metadata_list[[name]], font_settings)
-          all_blocks <- c(all_blocks, as.list(styled))
-        }
-        combined_block <- do.call(officer::block_list, all_blocks)
-
-        if (!is.null(footer_ph_label)) {
-          ppt <- officer::ph_with(
-            ppt,
-            value = combined_block,
-            location = officer::ph_location_label(ph_label = footer_ph_label)
-          )
-          log4r::debug(.le$logger, paste("Added styled footnotes to footer for slide", slide_idx))
-        } else {
-          ## Pre-initialize notes slide to avoid inheriting notes master formatting
-          ppt <- officer::set_notes(ppt, value = "", location = officer::notes_location_type("body"))
-          ppt <- officer::set_notes(ppt, value = combined_block, location = officer::notes_location_type("body"))
-          log4r::debug(.le$logger, paste("Added styled combined notes for slide", slide_idx))
-        }
-      } else {
-        ## Plain text path (default, unchanged behavior)
-        combined_notes <- paste(
-          sapply(names(slide_metadata_list), function(name) {
-            paste0("## ", name, "\n", format_slide_notes(slide_metadata_list[[name]]))
-          }),
-          collapse = "\n\n"
-        )
-
-        if (!is.null(footer_ph_label)) {
-          ppt <- officer::ph_with(
-            ppt,
-            value = combined_notes,
-            location = officer::ph_location_label(ph_label = footer_ph_label)
-          )
-          log4r::debug(.le$logger, paste("Added footnotes to footer for slide", slide_idx))
-        } else {
-          ppt <- officer::set_notes(ppt, value = combined_notes, location = officer::notes_location_type("body"))
-          log4r::debug(.le$logger, paste("Added combined notes for slide", slide_idx))
-        }
-      }
-    }
+  if (!is.null(base_pptx) && file.exists(base_pptx)) {
+    args <- c(args, "-b", base_pptx)
   }
-  print(ppt, target = output_pptx)
+
+  paths <- reportifyr::get_venv_uv_paths()
+  venv_path <- paths$venv
+  uv_path <- paths$uv
+  log4r::debug(.le$logger, paste("venv_path resolved to:", venv_path))
+  log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
+
+  result <- tryCatch({
+    processx::run(
+      command = uv_path,
+      args = args,
+      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
+      error_on_status = TRUE,
+      echo = TRUE
+    )
+  }, error = function(e) {
+    log4r::error(.le$logger, paste0("Add images Python script failed. Status: ", e$status))
+    log4r::error(.le$logger, paste0("Add images Python script failed. Stderr: ", e$stderr))
+    log4r::info(.le$logger, paste0("Add images Python script failed. Stdout: ", e$stdout))
+    stop(paste("Add images script failed. Status: ", e$status, "Stderr: ", e$stderr))
+  })
+
   message(sprintf("PowerPoint saved as %s", output_pptx))
   log4r::info(.le$logger, paste("PowerPoint saved as", output_pptx))
 }

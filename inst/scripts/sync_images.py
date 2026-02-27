@@ -5,6 +5,7 @@ import json
 import hashlib
 from pptx import Presentation
 from py_logger import get_logger
+from pptx_utils import find_footer_placeholder, load_metadata_for_image, format_slide_notes
 
 
 def compute_file_hash(file_path):
@@ -39,104 +40,6 @@ def should_replace_image(shape, new_image_path, logger):
     except Exception as e:
         logger.warning(f"Could not compute hash: {e}. Will replace image.")
         return True, f"hash computation failed ({e})"
-
-
-def find_footer_placeholder(slide):
-    """Find the footer placeholder on a slide, if it exists.
-
-    Footer placeholders have placeholder index 11 in the PowerPoint spec.
-    """
-    for shape in slide.placeholders:
-        if shape.placeholder_format.idx == 11:
-            return shape
-    return None
-
-
-def load_metadata_for_image(image_path):
-    """Load metadata JSON for an image file.
-
-    Args:
-        image_path: Path to the image file
-
-    Returns:
-        dict with metadata, or None if not found
-    """
-    logger = get_logger()
-
-    # Construct metadata filename: {name}_{ext}_metadata.json
-    dir_name = os.path.dirname(image_path)
-    file_name = os.path.basename(image_path)
-    name, ext = os.path.splitext(file_name)
-    ext = ext.lstrip('.')  # Remove leading dot
-
-    metadata_filename = f"{name}_{ext}_metadata.json"
-    metadata_path = os.path.join(dir_name, metadata_filename)
-
-    logger.debug(f"Looking for metadata at: {metadata_path}")
-
-    if not os.path.exists(metadata_path):
-        logger.warning(f"Metadata file not found: {metadata_path}")
-        return None
-
-    try:
-        with open(metadata_path, 'r') as f:
-            metadata = json.load(f)
-        logger.debug(f"Loaded metadata from: {metadata_path}")
-        return metadata
-    except Exception as e:
-        logger.error(f"Error reading metadata file: {metadata_path} - {e}")
-        return None
-
-
-def format_slide_notes(metadata):
-    """Format slide notes with metadata.
-
-    Args:
-        metadata: dict containing the metadata (from load_metadata_for_image)
-
-    Returns:
-        Formatted string for slide notes
-    """
-    lines = []
-
-    # Source: source_meta.path + source_meta.latest_time
-    source_meta = metadata.get('source_meta', {})
-    source_path = source_meta.get('path', '')
-    source_time = source_meta.get('latest_time', '')
-
-    if source_path and source_time:
-        lines.append(f"Source: {source_path} {source_time}")
-    elif source_path:
-        lines.append(f"Source: {source_path}")
-    else:
-        lines.append("Source: N/A")
-
-    # Notes: object_meta.footnotes.notes (joined with ". ")
-    object_meta = metadata.get('object_meta', {})
-    footnotes = object_meta.get('footnotes', {})
-    notes_list = footnotes.get('notes', [])
-
-    if notes_list and any(n for n in notes_list if n):
-        notes_text = ' '.join(
-            n if n.endswith('.') else f"{n}."
-            for n in notes_list if n
-        )
-        lines.append(f"Notes: {notes_text}")
-    else:
-        lines.append("Notes: N/A")
-
-    # Abbreviations: object_meta.footnotes.abbreviations (comma-separated)
-    abbrev_list = footnotes.get('abbreviations', [])
-
-    if abbrev_list and any(a for a in abbrev_list if a):
-        lines.append(f"Abbreviations: {', '.join(a for a in abbrev_list if a)}")
-    else:
-        lines.append("Abbreviations: N/A")
-
-    # Trailing blank line separator
-    lines.append("")
-
-    return '\n'.join(lines)
 
 
 def normalize_text_for_comparison(text):
