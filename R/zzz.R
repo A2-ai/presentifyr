@@ -1,6 +1,6 @@
 .onLoad <- function(...) {
   shiny::addResourcePath("presentifyr", system.file(".", package = "presentifyr"))
-  options(shiny.maxRequestSize = 50000*1024^2)
+  options(shiny.maxRequestSize = 5 * 1024^3)
   toggle_logger()
 }
 
@@ -36,6 +36,17 @@ presentifyr_options_message <- function() {
     )
   } else {
     set_options <- c(set_options, paste("project.dir:", project_dir))
+  }
+
+  ## Exclude dirs
+  exclude_dirs <- getOption("presentifyr.exclude_dirs")
+  if (is.null(exclude_dirs)) {
+    project_options <- c(
+      project_options,
+      "Using default exclude dirs, set options('presentifyr.exclude_dirs') to change"
+    )
+  } else {
+    set_options <- c(set_options, paste("presentifyr.exclude_dirs:", paste(exclude_dirs, collapse = ", ")))
   }
 
   ## Version options
