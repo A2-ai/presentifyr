@@ -15,15 +15,7 @@ sync_images <- function(input_pptx,
                         output_pptx) {
   log4r::debug(.le$logger, "Starting sync images R function")
 
-  if (!file.exists(input_pptx)) {
-    log4r::error(.le$logger, paste("The input .pptx file does not exist:", input_pptx))
-    stop(paste("The input .pptx file does not exist:", input_pptx))
-  }
-
-  if (!grepl("\\.pptx$", input_pptx, ignore.case = TRUE)) {
-    log4r::error(.le$logger, paste("Invalid file type. Expected a .pptx file:", input_pptx))
-    stop("Invalid file type. Expected a .pptx file.")
-  }
+  validate_pptx_file(input_pptx)
 
   exclude_dirs <- default_exclude_dirs()
 

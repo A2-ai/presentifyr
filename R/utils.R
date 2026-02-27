@@ -11,6 +11,23 @@ get_project_dir <- function() {
   )
 }
 
+#' Validate that a file exists and has a .pptx extension
+#'
+#' @param file_path Path to the file to validate
+#'
+#' @keywords internal
+#' @noRd
+validate_pptx_file <- function(file_path) {
+  if (!file.exists(file_path)) {
+    log4r::error(.le$logger, paste("The input .pptx file does not exist:", file_path))
+    stop("The input .pptx file does not exist: ", file_path)
+  }
+  if (!grepl("\\.pptx$", file_path, ignore.case = TRUE)) {
+    log4r::error(.le$logger, paste("Invalid file type. Expected a .pptx file:", file_path))
+    stop("Invalid file type. Expected a .pptx file.")
+  }
+}
+
 #' Default directories to ignore when scanning for images
 #'
 #' Priority: options("presentifyr.exclude_dirs") > env PRFY_EXCLUDE_DIRS (colon/semicolon/comma

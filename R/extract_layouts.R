@@ -14,15 +14,7 @@ extract_layouts <- function(base_pptx,
 
   script <- system.file("scripts/extract_layouts.py", package = "presentifyr")
 
-  if (!file.exists(base_pptx)) {
-    log4r::error(.le$logger, paste("The input base_pptx does not exist:", base_pptx))
-    stop("Base PowerPoint file not found")
-  }
-
-  if (!grepl("\\.pptx$", base_pptx, ignore.case = TRUE)) {
-    log4r::error(.le$logger, paste("Invalid file type. Expected a .pptx file:", base_pptx))
-    stop("Invalid file type. Expected a .pptx file.")
-  }
+  validate_pptx_file(base_pptx)
 
   log4r::debug(.le$logger, paste("Using provided base_pptx: ", base_pptx))
 

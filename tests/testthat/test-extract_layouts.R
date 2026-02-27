@@ -4,7 +4,7 @@ test_that("extract_layouts fails when base_pptx file does not exist", {
   output_dir <- tempfile()
   dir.create(output_dir)
 
-  expect_error(extract_layouts(base_pptx, output_dir), "Base PowerPoint file not found")
+  expect_error(extract_layouts(base_pptx, output_dir), "The input .pptx file does not exist:")
 })
 
 test_that("extract_layouts fails when base_pptx file is not a .pptx", {
