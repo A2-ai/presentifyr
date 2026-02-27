@@ -19,11 +19,9 @@ get_project_dir <- function() {
 #' @noRd
 validate_pptx_file <- function(file_path) {
   if (!file.exists(file_path)) {
-    log4r::error(.le$logger, paste("The input .pptx file does not exist:", file_path))
     stop("The input .pptx file does not exist: ", file_path)
   }
   if (!grepl("\\.pptx$", file_path, ignore.case = TRUE)) {
-    log4r::error(.le$logger, paste("Invalid file type. Expected a .pptx file:", file_path))
     stop("Invalid file type. Expected a .pptx file.")
   }
 }
@@ -60,7 +58,7 @@ run_python_script <- function(script_args, label) {
   }, error = function(e) {
     log4r::error(.le$logger, paste0(label, " Python script failed. Status: ", e$status))
     log4r::error(.le$logger, paste0(label, " Python script failed. Stderr: ", e$stderr))
-    log4r::info(.le$logger, paste0(label, " Python script failed. Stdout: ", e$stdout))
+    log4r::debug(.le$logger, paste0(label, " Python script failed. Stdout: ", e$stdout))
     stop(paste(label, "script failed. Status: ", e$status, "Stderr: ", e$stderr))
   })
 }
@@ -140,7 +138,6 @@ parse_directory_for_images <- function(directory,
   log4r::debug(.le$logger, paste("Parsing directory for images:", directory))
 
   if (!dir.exists(directory)) {
-    log4r::error(.le$logger, paste("Directory does not exist:", directory))
     stop("The specified directory does not exist.")
   }
 
@@ -199,7 +196,7 @@ parse_directory_for_images <- function(directory,
   log4r::debug(.le$logger, paste("Found", length(image_files), "image file(s)."))
 
   if (length(image_files) == 0) {
-    log4r::info(.le$logger, "No image files found in the specified directory.")
+    log4r::debug(.le$logger, "No image files found in the specified directory.")
   }
 
   return(image_files)
@@ -234,7 +231,7 @@ load_image_metadata <- function(image_path) {
     log4r::debug(.le$logger, paste("Loaded metadata from:", metadata_path))
     return(metadata)
   }, error = function(e) {
-    log4r::error(.le$logger, paste("Error reading metadata file:", metadata_path, "-", e$message))
+    log4r::warn(.le$logger, paste("Error reading metadata file:", metadata_path, "-", e$message))
     return(NULL)
   })
 }

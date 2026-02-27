@@ -71,6 +71,5 @@ add_images <- function(files, output_pptx,
 
   result <- run_python_script(script_args, label = "Add images")
 
-  message(sprintf("PowerPoint saved as %s", output_pptx))
   log4r::info(.le$logger, paste("PowerPoint saved as", output_pptx))
 }

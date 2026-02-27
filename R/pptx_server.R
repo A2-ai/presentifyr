@@ -71,7 +71,7 @@ pptx_server <- function(id) {
       # 1. Create configs modal for uploading & configuring PPTX
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$configs, {
-        log4r::info(.le$logger, "Opening Configuration Modal")
+        log4r::debug(.le$logger, "Opening Configuration Modal")
         showConfigModal()
       })
 
@@ -193,7 +193,7 @@ pptx_server <- function(id) {
       # 2. UI for file input, template confirmation, layout selection
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$configs_options <- shiny::renderUI({
-        log4r::info(.le$logger, "Rendering UI for PPTX configuration & layout selection")
+        log4r::debug(.le$logger, "Rendering UI for PPTX configuration & layout selection")
 
         ## Force fileInput re-render when key changes (e.g., after clearing template)
         file_key <- rv$file_input_key
@@ -404,7 +404,7 @@ pptx_server <- function(id) {
         rv$uploaded_template <- input[[file_input_id]]
 
         if (is.null(rv$uploaded_template)) {
-          log4r::error(.le$logger, "No template PPTX file was uploaded")
+          log4r::warn(.le$logger, "No template PPTX file was uploaded")
           show_error_modal("No template file was uploaded. A blank template will be used instead.")
           return()
         }
@@ -439,7 +439,7 @@ pptx_server <- function(id) {
       # 5. Clear template logic + return to configs modal
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$clear_template, {
-        log4r::info(.le$logger, "Clearing template")
+        log4r::debug(.le$logger, "Clearing template")
         shiny::showModal(shiny::modalDialog(
           title = "Clear Template",
           "Are you sure you want to clear the current template and use a blank template?",
@@ -453,7 +453,7 @@ pptx_server <- function(id) {
       shiny::observeEvent(input$confirm_clear, {
         if (!is.null(rv$uploaded_template) && file.exists(rv$uploaded_template$datapath)) {
           file.remove(rv$uploaded_template$datapath)
-          log4r::info(.le$logger, "Template file removed")
+          log4r::debug(.le$logger, "Template file removed")
         }
 
         layout_dir <- file.path(tempdir(), "prfy_layouts")
@@ -490,7 +490,7 @@ pptx_server <- function(id) {
       # 6. Create sync modal for uploading & syncing PPTX
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$sync, {
-        log4r::info(.le$logger, "Opening Sync Modal")
+        log4r::debug(.le$logger, "Opening Sync Modal")
         shiny::showModal(shiny::modalDialog(
           title = "Sync Images",
           htmltools::tags$p("Use this menu to sync your PowerPoint with a local repository."),
@@ -500,7 +500,7 @@ pptx_server <- function(id) {
       })
 
       shiny::observeEvent(input$open_upload_sync, {
-        log4r::info(.le$logger, "Opening Upload Modal for Sync Modal")
+        log4r::debug(.le$logger, "Opening Upload Modal for Sync Modal")
         shiny::removeModal()
         shiny::showModal(shiny::modalDialog(
           title = "Upload PowerPoint for Syncing",
@@ -520,7 +520,7 @@ pptx_server <- function(id) {
         rv$uploaded_file <- input$uploaded_sync_file
 
         if (is.null(rv$uploaded_file)) {
-          log4r::error(.le$logger, "No PPTX file uploaded for syncing")
+          log4r::warn(.le$logger, "No PPTX file uploaded for syncing")
           show_error_modal("No PowerPoint file was uploaded for syncing. Please try again.")
           return()
         }
@@ -538,6 +538,7 @@ pptx_server <- function(id) {
 
         tryCatch({
           sync_images(input_pptx, output_pptx)
+          log4r::info(.le$logger, "Sync completed successfully")
 
           rv$processed_file <- output_pptx
 
@@ -595,7 +596,7 @@ pptx_server <- function(id) {
       # 7a. Preview modal for slide arrangement
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$preview_slides, {
-        log4r::info(.le$logger, "Opening slide preview modal")
+        log4r::debug(.le$logger, "Opening slide preview modal")
 
         selected <- selected_items()
         ## selected_items() returns list of lists with 'path' element - extract and make absolute
@@ -1294,7 +1295,7 @@ pptx_server <- function(id) {
         layout_dir <- file.path(tempdir(), "prfy_layouts")
         if (dir.exists(layout_dir)) {
           unlink(layout_dir, recursive = TRUE, force = TRUE)
-          log4r::info(.le$logger, paste("Session ended, removed layout directory:", layout_dir))
+          log4r::debug(.le$logger, paste("Session ended, removed layout directory:", layout_dir))
         }
 
         if ("pptx_layouts" %in% names(shiny::resourcePaths())) {
@@ -1308,7 +1309,7 @@ pptx_server <- function(id) {
           shiny::removeResourcePath(path_name)
         }
 
-        log4r::info(.le$logger, "Session ended, removed resource paths")
+        log4r::debug(.le$logger, "Session ended, removed resource paths")
       })
     }
   )

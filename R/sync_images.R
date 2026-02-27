@@ -20,6 +20,7 @@ sync_images <- function(input_pptx,
   exclude_dirs <- default_exclude_dirs()
 
   root_dir <- get_project_dir()
+  log4r::debug(.le$logger, paste("Scanning for images in:", root_dir))
 
   image_files <- parse_directory_for_images(
     directory = root_dir,
@@ -27,7 +28,6 @@ sync_images <- function(input_pptx,
   )
 
   if (length(image_files) == 0 || all(image_files == "")) {
-    log4r::error(.le$logger, paste("No image files found. Execution halted."))
     stop("No image files found. Execution halted.")
   }
 
