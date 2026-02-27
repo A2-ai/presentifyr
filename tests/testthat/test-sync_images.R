@@ -39,13 +39,9 @@ test_that("sync_images correctly creates and writes JSON dictionary", {
   file.create(input_pptx)
   output_pptx <- tempfile(fileext = ".pptx")
 
-  mockery::stub(sync_images, "reportifyr::get_venv_uv_paths", function() {
-    list(uv = "/mock/uv", venv = "/mock/venv")
-  })
-
   mock_images <- c("/path/to/image1.png", "/path/to/image2.png")
   mockery::stub(sync_images, "parse_directory_for_images", function(...) mock_images)
-  mockery::stub(sync_images, "processx::run", function(...) {
+  mockery::stub(sync_images, "run_python_script", function(script_args, label) {
     list(stdout = "Python script executed successfully", stderr = "", status = 0)
   })
 
@@ -77,11 +73,10 @@ test_that("sync_images uses relative keys when under project root and falls back
   output_pptx <- tempfile(fileext = ".pptx")
 
   mockery::stub(sync_images, "get_project_dir", function() root)
-  mockery::stub(sync_images, "reportifyr::get_venv_uv_paths", function() {
-    list(uv = "/mock/uv", venv = "/mock/venv")
-  })
   mockery::stub(sync_images, "parse_directory_for_images", function(...) c(img_rel, img_outside))
-  mockery::stub(sync_images, "processx::run", function(...) list(status = 0))
+  mockery::stub(sync_images, "run_python_script", function(script_args, label) {
+    list(stdout = "", stderr = "", status = 0)
+  })
   temp_json_file <- tempfile(fileext = ".json")
   mockery::stub(sync_images, "tempfile", function(fileext = ".json") temp_json_file)
 
@@ -99,7 +94,7 @@ test_that("sync_images fails when virtual environment does not exist", {
   file.create(input_pptx)
   output_pptx <- tempfile(fileext = ".pptx")
 
-  mockery::stub(sync_images, "reportifyr::get_venv_uv_paths", function() {
+  mockery::stub(sync_images, "run_python_script", function(script_args, label) {
     stop("Create virtual environment with initialize_python")
   })
 
@@ -115,24 +110,19 @@ test_that("sync_images fails when Python script execution fails", {
   file.create(input_pptx)
   output_pptx <- tempfile(fileext = ".pptx")
 
-  mockery::stub(sync_images, "reportifyr::get_venv_uv_paths", function() {
-    list(uv = "/mock/path/to/uv", venv = "/mock/venv")
-  })
-
   mock_images <- c("/path/to/image1.png", "/path/to/image2.png")
   mockery::stub(sync_images, "parse_directory_for_images", function(...) mock_images)
 
-  mock_run_fail <- function(...) {
+  mockery::stub(sync_images, "run_python_script", function(script_args, label) {
     e <- simpleError("Python script execution failed")
     e$status <- 1
     e$stdout <- ""
     e$stderr <- "Python script error occurred"
     stop(e)
-  }
-  mockery::stub(sync_images, "processx::run", mock_run_fail)
+  })
 
   expect_error(
     sync_images(input_pptx, output_pptx),
-    "Sync images script failed. Status:  1 Stderr:  Python script error occurred"
+    "Python script execution failed"
   )
 })

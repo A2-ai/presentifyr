@@ -63,32 +63,13 @@ add_images <- function(files, output_pptx,
   log4r::debug(.le$logger, paste("Config JSON written to:", temp_config))
 
   script <- system.file("scripts/add_images.py", package = "presentifyr")
-  args <- c("run", script, "-o", output_pptx, "-c", temp_config)
+  script_args <- c(script, "-o", output_pptx, "-c", temp_config)
 
   if (!is.null(base_pptx) && file.exists(base_pptx)) {
-    args <- c(args, "-b", base_pptx)
+    script_args <- c(script_args, "-b", base_pptx)
   }
 
-  paths <- reportifyr::get_venv_uv_paths()
-  venv_path <- paths$venv
-  uv_path <- paths$uv
-  log4r::debug(.le$logger, paste("venv_path resolved to:", venv_path))
-  log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
-
-  result <- tryCatch({
-    processx::run(
-      command = uv_path,
-      args = args,
-      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
-      error_on_status = TRUE,
-      echo = TRUE
-    )
-  }, error = function(e) {
-    log4r::error(.le$logger, paste0("Add images Python script failed. Status: ", e$status))
-    log4r::error(.le$logger, paste0("Add images Python script failed. Stderr: ", e$stderr))
-    log4r::info(.le$logger, paste0("Add images Python script failed. Stdout: ", e$stdout))
-    stop(paste("Add images script failed. Status: ", e$status, "Stderr: ", e$stderr))
-  })
+  result <- run_python_script(script_args, label = "Add images")
 
   message(sprintf("PowerPoint saved as %s", output_pptx))
   log4r::info(.le$logger, paste("PowerPoint saved as", output_pptx))

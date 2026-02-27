@@ -28,6 +28,43 @@ validate_pptx_file <- function(file_path) {
   }
 }
 
+#' Run a Python script via uv using the reportifyr venv
+#'
+#' Resolves venv/uv paths, executes the script with processx, and provides
+#' standardized error handling with logging.
+#'
+#' @param script_args Character vector of arguments to pass after "uv run".
+#'   Typically c(script_path, "-flag", value, ...).
+#' @param label Short label for error messages (e.g. "Add images", "Sync images").
+#'
+#' @return The processx result list (stdout, stderr, status).
+#' @keywords internal
+#' @noRd
+run_python_script <- function(script_args, label) {
+  paths <- reportifyr::get_venv_uv_paths()
+  venv_path <- paths$venv
+  uv_path <- paths$uv
+  log4r::debug(.le$logger, paste("venv_path resolved to:", venv_path))
+  log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
+
+  args <- c("run", script_args)
+
+  tryCatch({
+    processx::run(
+      command = uv_path,
+      args = args,
+      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
+      error_on_status = TRUE,
+      echo = TRUE
+    )
+  }, error = function(e) {
+    log4r::error(.le$logger, paste0(label, " Python script failed. Status: ", e$status))
+    log4r::error(.le$logger, paste0(label, " Python script failed. Stderr: ", e$stderr))
+    log4r::info(.le$logger, paste0(label, " Python script failed. Stdout: ", e$stdout))
+    stop(paste(label, "script failed. Status: ", e$status, "Stderr: ", e$stderr))
+  })
+}
+
 #' Default directories to ignore when scanning for images
 #'
 #' Priority: options("presentifyr.exclude_dirs") > env PRFY_EXCLUDE_DIRS (colon/semicolon/comma

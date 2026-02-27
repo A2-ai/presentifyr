@@ -18,28 +18,10 @@ extract_layouts <- function(base_pptx,
 
   log4r::debug(.le$logger, paste("Using provided base_pptx: ", base_pptx))
 
-  args <- c("run", script, "-b", base_pptx, "-o", output_dir)
-
-  paths <- reportifyr::get_venv_uv_paths()
-  venv_path <- paths$venv
-  uv_path <- paths$uv
-  log4r::debug(.le$logger, paste("venv_path resolved to:", venv_path))
-  log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
-
-  result <- tryCatch({
-    processx::run(
-      command = uv_path,
-      args = args,
-      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
-      error_on_status = TRUE,
-      echo = TRUE,
-    )
-  }, error = function(e) {
-    log4r::error(.le$logger, paste0("Extract layouts Python script failed. Status: ", e$status))
-    log4r::error(.le$logger, paste0("Extract layouts Python script failed. Stderr: ", e$stderr))
-    log4r::info(.le$logger, paste0("Extract layouts Python script failed. Stdout: ", e$stdout))
-    stop(paste("Extract layouts Python script failed. Status: ", e$status, "Stderr: ", e$stderr))
-  })
+  result <- run_python_script(
+    script_args = c(script, "-b", base_pptx, "-o", output_dir),
+    label = "Extract layouts"
+  )
 
   layout_images <- list.files(
     output_dir,
