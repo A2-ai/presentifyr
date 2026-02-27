@@ -907,7 +907,9 @@ pptx_server <- function(id) {
                 if (idx > 1) {
                   files <- unlist(rv$slide_groups)
                   files[c(idx - 1, idx)] <- files[c(idx, idx - 1)]
-                  rv$slide_groups <- regroup_files(files, rv$slide_groups)
+                  result <- regroup_files(files, rv$slide_groups)
+                  rv$slide_groups <- result$groups
+                  rv$slide_positions <- result$positions
                 }
               }, ignoreInit = TRUE)
 
@@ -915,14 +917,17 @@ pptx_server <- function(id) {
                 files <- unlist(rv$slide_groups)
                 if (idx < length(files)) {
                   files[c(idx, idx + 1)] <- files[c(idx + 1, idx)]
-                  rv$slide_groups <- regroup_files(files, rv$slide_groups)
+                  result <- regroup_files(files, rv$slide_groups)
+                  rv$slide_groups <- result$groups
+                  rv$slide_positions <- result$positions
                 }
               }, ignoreInit = TRUE)
 
               ## Split before: this image and everything after moves to new slide
               shiny::observeEvent(input[[paste0("split_before_", idx)]], {
-                ## Find which slide this index is in and split it
-                rv$slide_groups <- split_before_index(rv$slide_groups, idx)
+                result <- split_before_index(rv$slide_groups, rv$slide_positions, idx)
+                rv$slide_groups <- result$groups
+                rv$slide_positions <- result$positions
               }, ignoreInit = TRUE)
             })
             .created_obs$move <- c(.created_obs$move, i)
@@ -976,93 +981,6 @@ pptx_server <- function(id) {
           }
         }
       })
-
-      ## Helper to regroup files maintaining slide sizes (also resets positions)
-      regroup_files <- function(files, current_groups) {
-        sizes <- lengths(current_groups)
-        new_groups <- vector("list", length(sizes))
-        new_positions <- vector("list", length(sizes))
-        file_idx <- 1
-        for (i in seq_along(sizes)) {
-          new_groups[[i]] <- files[file_idx:(file_idx + sizes[i] - 1)]
-          ## Reset positions to 1, 2, 3... when reordering
-          new_positions[[i]] <- seq_len(sizes[i])
-          file_idx <- file_idx + sizes[i]
-        }
-        rv$slide_positions <- new_positions
-        new_groups
-      }
-
-      ## Helper to split slides BEFORE a global file index
-      ## "Split before" semantics: this image and everything after moves to new slide
-      split_before_index <- function(groups, global_idx) {
-        cumulative <- cumsum(lengths(groups))
-
-        ## Find which slide contains this index
-        slide_idx <- which(cumulative >= global_idx)[1]
-        prior <- if (slide_idx == 1) 0 else cumulative[slide_idx - 1]
-        local_idx <- global_idx - prior
-
-        ## Split the slide: before gets images 1 to local_idx-1, after gets local_idx to end
-        slide_files <- groups[[slide_idx]]
-        before_files <- slide_files[seq_len(local_idx - 1)]
-        after_files <- slide_files[local_idx:length(slide_files)]
-
-        ## Rebuild groups
-        new_groups <- list()
-        new_positions <- list()
-
-        if (slide_idx > 1) {
-          new_groups <- groups[seq_len(slide_idx - 1)]
-          new_positions <- rv$slide_positions[seq_len(slide_idx - 1)]
-        }
-
-        ## Add before_files (will have at least 1 image since button only shows for file_idx > 1)
-        new_groups <- c(new_groups, list(before_files))
-        new_positions <- c(new_positions, list(seq_len(length(before_files))))
-
-        ## Add after_files (this image and any following in the same slide)
-        new_groups <- c(new_groups, list(after_files))
-        new_positions <- c(new_positions, list(seq_len(length(after_files))))
-
-        ## Add remaining slides
-        if (slide_idx < length(groups)) {
-          new_groups <- c(new_groups, groups[(slide_idx + 1):length(groups)])
-          new_positions <- c(new_positions, rv$slide_positions[(slide_idx + 1):length(groups)])
-        }
-
-        rv$slide_positions <- new_positions
-        new_groups
-      }
-
-      ## Helper to merge slide with next
-      merge_slides <- function(groups, positions, slide_idx) {
-        if (slide_idx >= length(groups)) {
-          return(list(groups = groups, positions = positions))
-        }
-
-        merged_files <- c(groups[[slide_idx]], groups[[slide_idx + 1]])
-        ## Reassign positions sequentially when merging
-        merged_positions <- seq_len(length(merged_files))
-
-        new_groups <- list()
-        new_positions <- list()
-
-        if (slide_idx > 1) {
-          new_groups <- groups[seq_len(slide_idx - 1)]
-          new_positions <- positions[seq_len(slide_idx - 1)]
-        }
-
-        new_groups <- c(new_groups, list(merged_files))
-        new_positions <- c(new_positions, list(merged_positions))
-
-        if (slide_idx + 1 < length(groups)) {
-          new_groups <- c(new_groups, groups[(slide_idx + 2):length(groups)])
-          new_positions <- c(new_positions, positions[(slide_idx + 2):length(groups)])
-        }
-
-        list(groups = new_groups, positions = new_positions)
-      }
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 7b. Download handler (now triggered from preview modal)
