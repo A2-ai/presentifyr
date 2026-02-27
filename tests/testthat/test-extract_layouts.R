@@ -18,32 +18,21 @@ test_that("extract_layouts fails when base_pptx file is not a .pptx", {
 })
 
 test_that("extract_layouts fails when virtual environment does not exist", {
-  base_pptx <- tempfile(fileext = ".pptx")
-  file.create(base_pptx)
-
+  base_pptx <- create_temp_pptx()
   output_dir <- tempfile()
   dir.create(output_dir)
 
-  mockery::stub(extract_layouts, "run_python_script", function(script_args, label) {
-    stop("Create virtual environment with initialize_python")
-  })
+  mockery::stub(extract_layouts, "run_python_script", mock_venv_missing)
 
   expect_error(extract_layouts(base_pptx, output_dir), "Create virtual environment")
 })
 
 test_that("extract_layouts fails when Python script execution fails", {
-  base_pptx <- tempfile(fileext = ".pptx")
-  file.create(base_pptx)
+  base_pptx <- create_temp_pptx()
   output_dir <- tempfile()
   dir.create(output_dir)
 
-  mockery::stub(extract_layouts, "run_python_script", function(script_args, label) {
-    e <- simpleError("Python script execution failed")
-    e$status <- 1
-    e$stdout <- ""
-    e$stderr <- "Python script error occurred"
-    stop(e)
-  })
+  mockery::stub(extract_layouts, "run_python_script", mock_python_failure)
 
   expect_error(
     extract_layouts(base_pptx, output_dir),
@@ -52,14 +41,11 @@ test_that("extract_layouts fails when Python script execution fails", {
 })
 
 test_that("extract_layouts correctly parses layout indices from filenames", {
-  base_pptx <- tempfile(fileext = ".pptx")
-  file.create(base_pptx)
+  base_pptx <- create_temp_pptx()
   output_dir <- tempfile()
   dir.create(output_dir)
 
-  mockery::stub(extract_layouts, "run_python_script", function(script_args, label) {
-    list(stdout = "Python script executed successfully", stderr = "", status = 0)
-  })
+  mockery::stub(extract_layouts, "run_python_script", mock_python_success)
 
   mock_images <- file.path(output_dir, c("layout_3.png", "layout_1.png", "layout_10.png"))
   mockery::stub(extract_layouts, "list.files", function(...) mock_images)
