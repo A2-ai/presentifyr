@@ -19,7 +19,7 @@ get_project_dir <- function() {
 #' @keywords internal
 #' @noRd
 default_exclude_dirs <- function() {
-  builtin <- c(
+  exclude_dirs <- c(
     "renv", "rv", "rv/library", ".git", ".hg", ".svn",
     "node_modules", ".Rproj.user", ".venv", ".direnv",
     "__pycache__", "env", "site-library", ".cache"
@@ -27,16 +27,15 @@ default_exclude_dirs <- function() {
 
   env_val <- Sys.getenv("PRFY_EXCLUDE_DIRS", unset = "")
   if (nzchar(env_val)) {
-    parts <- unlist(strsplit(env_val, "[;:,]", perl = TRUE))
-    builtin <- parts
+    exclude_dirs <- unlist(strsplit(env_val, "[;:,]", perl = TRUE))
   }
 
   opt_val <- getOption("presentifyr.exclude_dirs")
   if (!is.null(opt_val)) {
-    builtin <- opt_val
+    exclude_dirs <- opt_val
   }
 
-  unique(builtin[nzchar(builtin)])
+  unique(exclude_dirs[nzchar(exclude_dirs)])
 }
 
 #' Key used in alt-text and sync mapping for images
@@ -81,7 +80,7 @@ parse_directory_for_images <- function(directory,
 
   # helper: check if any path segment matches excluded dir names
   should_skip <- function(rel_path) {
-    segments <- strsplit(rel_path, .Platform$file.sep, fixed = FALSE)[[1]]
+    segments <- strsplit(rel_path, .Platform$file.sep, fixed = TRUE)[[1]]
     any(segments %in% exclude_dirs)
   }
 

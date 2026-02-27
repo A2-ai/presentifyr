@@ -228,7 +228,7 @@ pptx_server <- function(id) {
         if (!is.null(rv$selected_layout_name)) {
           layout_label <- htmltools::tags$p(
             style = "font-weight:bold; color:#e45600; margin-top:5px;",
-            paste("Selected layout:", rv$selected_layout_name)
+            paste("Selected layout:", rv$original_layout_name)
           )
         }
 
@@ -264,6 +264,7 @@ pptx_server <- function(id) {
         total <- nrow(rv$extracted_layouts)
 
         layout_name <- rv$extracted_layouts$layout_name[idx]
+        display_name <- rv$extracted_layouts$original_name[idx]
         image_path <- rv$extracted_layouts$image_path[idx]
         placeholder_count <- rv$extracted_layouts$placeholder_count[idx]
 
@@ -295,7 +296,7 @@ pptx_server <- function(id) {
             htmltools::tags$img(src = image_path, class = "layout-carousel-img"),
             htmltools::tags$div(
               class = "layout-carousel-info",
-              htmltools::tags$div(class = "layout-carousel-name", layout_name),
+              htmltools::tags$div(class = "layout-carousel-name", display_name),
               htmltools::tags$span(
                 class = "layout-carousel-slots",
                 paste(placeholder_count, ifelse(placeholder_count == 1, "slot", "slots"))
@@ -334,7 +335,8 @@ pptx_server <- function(id) {
       shiny::observeEvent(input$layout_select_btn, {
         shiny::req(rv$extracted_layouts)
         rv$selected_layout_name <- rv$extracted_layouts$layout_name[rv$layout_index]
-        log4r::info(.le$logger, paste0("User selected layout: ", rv$selected_layout_name))
+        rv$original_layout_name <- rv$extracted_layouts$original_name[rv$layout_index]
+        log4r::info(.le$logger, paste0("User selected layout: ", rv$original_layout_name))
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -473,6 +475,7 @@ pptx_server <- function(id) {
         rv$uploaded_template <- NULL
         rv$extracted_layouts <- NULL
         rv$selected_layout_name <- NULL
+        rv$original_layout_name <- NULL
         rv$file_input_key <- rv$file_input_key + 1L  ## Force fileInput to re-render with new ID
 
         shiny::removeModal()
@@ -635,9 +638,7 @@ pptx_server <- function(id) {
         ## Determine placeholder count from selected layout
         placeholder_count <- 1L
         if (!is.null(rv$extracted_layouts) && !is.null(rv$selected_layout_name)) {
-          ## Convert selected layout name to safe name for lookup
-          safe_name <- gsub("[^\\w\\-_]", "_", rv$selected_layout_name, perl = TRUE)
-          layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == safe_name, ]
+          layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == rv$selected_layout_name, ]
           if (nrow(layout_row) > 0 && !is.na(layout_row$placeholder_count[1])) {
             placeholder_count <- layout_row$placeholder_count[1]
           }
@@ -1102,7 +1103,7 @@ pptx_server <- function(id) {
 
           base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath
 
-          chosen_layout <- rv$selected_layout_name
+          chosen_layout <- rv$original_layout_name
 
           tryCatch({
             start_time <- Sys.time()
@@ -1229,7 +1230,7 @@ pptx_server <- function(id) {
                 htmltools::tags$img(src = image_path),
                 htmltools::tags$div(
                   class = "layout-caption",
-                  htmltools::tags$span(class = "layout-name", rv$selected_layout_name),
+                  htmltools::tags$span(class = "layout-name", rv$original_layout_name),
                   slot_badge
                 )
               )
@@ -1320,10 +1321,10 @@ pptx_server <- function(id) {
           shiny::removeResourcePath("pptx_layouts")
         }
 
-        ## Clean up preview image resource paths
+        ## Clean up preview and filelist image resource paths
         resource_paths <- names(shiny::resourcePaths())
-        preview_paths <- resource_paths[grepl("^preview_imgs_", resource_paths)]
-        for (path_name in preview_paths) {
+        dynamic_paths <- resource_paths[grepl("^(preview_imgs_|filelist_imgs_)", resource_paths)]
+        for (path_name in dynamic_paths) {
           shiny::removeResourcePath(path_name)
         }
 
