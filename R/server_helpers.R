@@ -81,6 +81,72 @@ split_before_index <- function(groups, positions, global_idx) {
 #' @return A list with `groups` and `positions`.
 #' @keywords internal
 #' @noRd
+#' Distribute files across slides based on placeholder count
+#'
+#' Creates the initial slide grouping by distributing files evenly across
+#' slides, each holding up to `placeholder_count` images. Positions are
+#' assigned sequentially (1, 2, ...) within each slide.
+#'
+#' @param files Character vector of file paths.
+#' @param placeholder_count Integer, max images per slide.
+#'
+#' @return A list with `groups` (list of character vectors) and
+#'   `positions` (list of integer vectors).
+#' @keywords internal
+#' @noRd
+distribute_files_to_slides <- function(files, placeholder_count) {
+  n_files <- length(files)
+  n_slides <- ceiling(n_files / placeholder_count)
+
+  slide_groups <- vector("list", n_slides)
+  slide_positions <- vector("list", n_slides)
+
+  for (i in seq_along(files)) {
+    slide_idx <- ceiling(i / placeholder_count)
+    if (is.null(slide_groups[[slide_idx]])) {
+      slide_groups[[slide_idx]] <- character(0)
+      slide_positions[[slide_idx]] <- integer(0)
+    }
+    slide_groups[[slide_idx]] <- c(slide_groups[[slide_idx]], files[i])
+    pos_in_slide <- length(slide_groups[[slide_idx]])
+    slide_positions[[slide_idx]] <- c(slide_positions[[slide_idx]], pos_in_slide)
+  }
+
+  list(groups = slide_groups, positions = slide_positions)
+}
+
+#' Sanitize a user-supplied filename for PowerPoint output
+#'
+#' Strips illegal characters, appends `.pptx` if missing, and returns a default
+#' when the input is empty or `NULL`.
+#'
+#' @param name Character scalar (may be `NULL` or empty).
+#'
+#' @return A sanitized filename string ending in `.pptx`.
+#' @keywords internal
+#' @noRd
+sanitize_filename <- function(name) {
+  if (is.null(name) || name == "") {
+    return("report.pptx")
+  }
+  has_ext <- grepl("\\.pptx$", name, ignore.case = TRUE)
+  stem <- if (has_ext) sub("\\.[Pp][Pp][Tt][Xx]$", "", name) else name
+  stem <- gsub("[^[:alnum:]_ -]", "_", stem)
+  paste0(stem, ".pptx")
+}
+
+#' Merge a slide with the next slide
+#'
+#' Combines the images from `slide_idx` and `slide_idx + 1` into a single
+#' slide. Positions are reset to sequential for the merged slide.
+#'
+#' @param groups List of character vectors (current slide groupings).
+#' @param positions List of integer vectors (current slide positions).
+#' @param slide_idx Integer, the 1-based index of the slide to merge with next.
+#'
+#' @return A list with `groups` and `positions`.
+#' @keywords internal
+#' @noRd
 merge_slides <- function(groups, positions, slide_idx) {
   if (slide_idx >= length(groups)) {
     return(list(groups = groups, positions = positions))

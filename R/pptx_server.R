@@ -631,26 +631,12 @@ pptx_server <- function(id) {
         rv$placeholder_count <- placeholder_count
 
         ## Create initial slide groups (auto-distribute)
-        n_files <- length(files)
-        n_slides <- ceiling(n_files / placeholder_count)
+        result <- distribute_files_to_slides(files, placeholder_count)
+        rv$slide_groups <- result$groups
+        rv$slide_positions <- result$positions
 
-        slide_groups <- vector("list", n_slides)
-        slide_positions <- vector("list", n_slides)
-        for (i in seq_along(files)) {
-          slide_idx <- ceiling(i / placeholder_count)
-          if (is.null(slide_groups[[slide_idx]])) {
-            slide_groups[[slide_idx]] <- character(0)
-            slide_positions[[slide_idx]] <- integer(0)
-          }
-          slide_groups[[slide_idx]] <- c(slide_groups[[slide_idx]], files[i])
-          ## Default position: 1, 2, 3... in order
-          pos_in_slide <- length(slide_groups[[slide_idx]])
-          slide_positions[[slide_idx]] <- c(slide_positions[[slide_idx]], pos_in_slide)
-        }
-        rv$slide_groups <- slide_groups
-        rv$slide_positions <- slide_positions
-
-        log4r::debug(.le$logger, paste("Preview:", n_files, "files,", placeholder_count, "placeholders,", n_slides, "slides"))
+        n_slides <- length(result$groups)
+        log4r::debug(.le$logger, paste("Preview:", length(files), "files,", placeholder_count, "placeholders,", n_slides, "slides"))
 
         showPreviewModal(placeholder_count)
       })
@@ -987,15 +973,7 @@ pptx_server <- function(id) {
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$download <- shiny::downloadHandler(
         filename = function() {
-          base <- rv$report_filename
-          if (is.null(base) || base == "") {
-            "report.pptx"
-          } else {
-            base <- gsub("[^[:alnum:]_ -]", "_", base)
-            if (!grepl("\\.pptx$", base, ignore.case = TRUE))
-              base <- paste0(base, ".pptx")
-            base
-          }
+          sanitize_filename(rv$report_filename)
         },
         content = function(file) {
           temp_pptx <- tempfile(fileext = ".pptx")

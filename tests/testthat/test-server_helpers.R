@@ -66,6 +66,74 @@ test_that("split_before_index resets positions for split slides", {
   expect_equal(result$positions[[2]], 1L)
 })
 
+## distribute_files_to_slides --------------------------------------------------
+
+test_that("distribute_files_to_slides fills slides up to placeholder_count", {
+  files <- c("a.png", "b.png", "c.png", "d.png", "e.png")
+
+  result <- distribute_files_to_slides(files, placeholder_count = 2)
+
+  expect_equal(length(result$groups), 3)
+  expect_equal(result$groups[[1]], c("a.png", "b.png"))
+  expect_equal(result$groups[[2]], c("c.png", "d.png"))
+  expect_equal(result$groups[[3]], "e.png")
+})
+
+test_that("distribute_files_to_slides assigns sequential positions within each slide", {
+  files <- c("a.png", "b.png", "c.png")
+
+  result <- distribute_files_to_slides(files, placeholder_count = 3)
+
+  expect_equal(length(result$groups), 1)
+  expect_equal(result$positions[[1]], c(1L, 2L, 3L))
+})
+
+test_that("distribute_files_to_slides with placeholder_count=1 gives one file per slide", {
+  files <- c("a.png", "b.png", "c.png")
+
+  result <- distribute_files_to_slides(files, placeholder_count = 1)
+
+  expect_equal(length(result$groups), 3)
+  expect_equal(result$groups[[1]], "a.png")
+  expect_equal(result$groups[[2]], "b.png")
+  expect_equal(result$groups[[3]], "c.png")
+  expect_equal(result$positions, list(1L, 1L, 1L))
+})
+
+test_that("distribute_files_to_slides handles exact multiple of placeholder_count", {
+  files <- c("a.png", "b.png", "c.png", "d.png")
+
+  result <- distribute_files_to_slides(files, placeholder_count = 2)
+
+  expect_equal(length(result$groups), 2)
+  expect_equal(result$groups[[1]], c("a.png", "b.png"))
+  expect_equal(result$groups[[2]], c("c.png", "d.png"))
+})
+
+## sanitize_filename -----------------------------------------------------------
+
+test_that("sanitize_filename returns default for NULL input", {
+  expect_equal(sanitize_filename(NULL), "report.pptx")
+})
+
+test_that("sanitize_filename returns default for empty string", {
+  expect_equal(sanitize_filename(""), "report.pptx")
+})
+
+test_that("sanitize_filename appends .pptx when missing", {
+  expect_equal(sanitize_filename("my_report"), "my_report.pptx")
+})
+
+test_that("sanitize_filename preserves existing .pptx extension", {
+  expect_equal(sanitize_filename("my_report.pptx"), "my_report.pptx")
+})
+
+test_that("sanitize_filename strips illegal characters", {
+  result <- sanitize_filename("my/report<2>.pptx")
+  expect_false(grepl("[/<>]", result))
+  expect_true(grepl("\\.pptx$", result))
+})
+
 ## merge_slides ----------------------------------------------------------------
 
 test_that("merge_slides combines two adjacent slides", {
