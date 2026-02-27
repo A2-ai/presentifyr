@@ -405,11 +405,7 @@ pptx_server <- function(id) {
 
         if (is.null(rv$uploaded_template)) {
           log4r::error(.le$logger, "No template PPTX file was uploaded")
-          shiny::showModal(shiny::modalDialog(
-            title = "Error",
-            "No template file was uploaded. A blank template will be used instead.",
-            footer = shiny::modalButton("Close")
-          ))
+          show_error_modal("No template file was uploaded. A blank template will be used instead.")
           return()
         }
 
@@ -434,11 +430,7 @@ pptx_server <- function(id) {
 
         }, error = function(e) {
           log4r::error(.le$logger, paste0("Error extracting layouts: ", e$message))
-          shiny::showModal(shiny::modalDialog(
-            title = "Error",
-            paste("An error occurred while extracting layouts:", e$message),
-            footer = shiny::modalButton("Close")
-          ))
+          show_error_modal(paste("An error occurred while extracting layouts:", e$message))
         })
       })
 
@@ -529,11 +521,7 @@ pptx_server <- function(id) {
 
         if (is.null(rv$uploaded_file)) {
           log4r::error(.le$logger, "No PPTX file uploaded for syncing")
-          shiny::showModal(shiny::modalDialog(
-            title = "Error",
-            "No PowerPoint file was uploaded for syncing. Please try again.",
-            footer = shiny::modalButton("Close")
-          ))
+          show_error_modal("No PowerPoint file was uploaded for syncing. Please try again.")
           return()
         }
 
@@ -574,11 +562,7 @@ pptx_server <- function(id) {
 
         }, error = function(e) {
           log4r::error(.le$logger, paste0("Error processing PPTX file: ", e$message))
-          shiny::showModal(shiny::modalDialog(
-            title = "Error",
-            paste("An error occurred while processing your file:", e$message),
-            footer = shiny::modalButton("Close")
-          ))
+          show_error_modal(paste("An error occurred while processing your file:", e$message))
         })
       })
 
@@ -1129,11 +1113,7 @@ pptx_server <- function(id) {
             ))
           }, error = function(e) {
             log4r::error(.le$logger, paste0("Error creating PPTX: ", e$message))
-            shiny::showModal(shiny::modalDialog(
-              title = "Error",
-              paste("An error occurred while creating the PowerPoint:", e$message),
-              footer = shiny::modalButton("Close")
-            ))
+            show_error_modal(paste("An error occurred while creating the PowerPoint:", e$message))
           }, finally = {
             on.exit({
               if (file.exists(temp_pptx)) file.remove(temp_pptx)

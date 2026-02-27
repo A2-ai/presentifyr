@@ -65,6 +65,20 @@ run_python_script <- function(script_args, label) {
   })
 }
 
+#' Show a standardized error modal in the Shiny UI
+#'
+#' @param message The error message to display
+#'
+#' @keywords internal
+#' @noRd
+show_error_modal <- function(message) {
+  shiny::showModal(shiny::modalDialog(
+    title = "Error",
+    message,
+    footer = shiny::modalButton("Close")
+  ))
+}
+
 #' Default directories to ignore when scanning for images
 #'
 #' Priority: options("presentifyr.exclude_dirs") > env PRFY_EXCLUDE_DIRS (colon/semicolon/comma
