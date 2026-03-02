@@ -2,6 +2,8 @@
 
 #' Updates the logging level for functions. Default is set to WARN
 #'
+#' @return Called for its side effect of updating the logger in `.le$logger`.
+#'   Returns `NULL` invisibly.
 #' @export
 #'
 #' @examples \dontrun{
