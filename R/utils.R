@@ -11,6 +11,72 @@ get_project_dir <- function() {
   )
 }
 
+#' Validate that a file exists and has a .pptx extension
+#'
+#' @param file_path Path to the file to validate
+#'
+#' @keywords internal
+#' @noRd
+validate_pptx_file <- function(file_path) {
+  if (!file.exists(file_path)) {
+    stop("The input .pptx file does not exist: ", file_path)
+  }
+  if (!grepl("\\.pptx$", file_path, ignore.case = TRUE)) {
+    stop("Invalid file type. Expected a .pptx file.")
+  }
+}
+
+#' Run a Python script via uv using the reportifyr venv
+#'
+#' Resolves venv/uv paths, executes the script with processx, and provides
+#' standardized error handling with logging.
+#'
+#' @param script_args Character vector of arguments to pass after "uv run".
+#'   Typically c(script_path, "-flag", value, ...).
+#' @param label Short label for error messages (e.g. "Add images", "Sync images").
+#'
+#' @return The processx result list (stdout, stderr, status).
+#' @keywords internal
+#' @noRd
+run_python_script <- function(script_args, label) {
+  paths <- reportifyr::get_venv_uv_paths()
+  venv_path <- paths$venv
+  uv_path <- paths$uv
+  log4r::debug(.le$logger, paste("run_python_script: venv =", venv_path))
+  log4r::debug(.le$logger, paste("run_python_script: uv =", uv_path))
+
+  args <- c("run", script_args)
+
+  tryCatch({
+    processx::run(
+      command = uv_path,
+      args = args,
+      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
+      error_on_status = TRUE,
+      echo = TRUE
+    )
+  }, error = function(e) {
+    log4r::error(.le$logger, paste0(label, " Python script failed. Status: ", e$status))
+    log4r::error(.le$logger, paste0(label, " Python script failed. Stderr: ", e$stderr))
+    log4r::debug(.le$logger, paste0(label, " Python script failed. Stdout: ", e$stdout))
+    stop(paste0(label, " failed. Set PRFY_VERBOSE=DEBUG for details."))
+  })
+}
+
+#' Show a standardized error modal in the Shiny UI
+#'
+#' @param message The error message to display
+#'
+#' @keywords internal
+#' @noRd
+show_error_modal <- function(message) {
+  shiny::showModal(shiny::modalDialog(
+    title = "Error",
+    message,
+    footer = shiny::modalButton("Close")
+  ))
+}
+
 #' Default directories to ignore when scanning for images
 #'
 #' Priority: options("presentifyr.exclude_dirs") > env PRFY_EXCLUDE_DIRS (colon/semicolon/comma
@@ -19,7 +85,7 @@ get_project_dir <- function() {
 #' @keywords internal
 #' @noRd
 default_exclude_dirs <- function() {
-  builtin <- c(
+  exclude_dirs <- c(
     "renv", "rv", "rv/library", ".git", ".hg", ".svn",
     "node_modules", ".Rproj.user", ".venv", ".direnv",
     "__pycache__", "env", "site-library", ".cache"
@@ -27,16 +93,15 @@ default_exclude_dirs <- function() {
 
   env_val <- Sys.getenv("PRFY_EXCLUDE_DIRS", unset = "")
   if (nzchar(env_val)) {
-    parts <- unlist(strsplit(env_val, "[;:,]", perl = TRUE))
-    builtin <- parts
+    exclude_dirs <- unlist(strsplit(env_val, "[;:,]", perl = TRUE))
   }
 
   opt_val <- getOption("presentifyr.exclude_dirs")
   if (!is.null(opt_val)) {
-    builtin <- opt_val
+    exclude_dirs <- opt_val
   }
 
-  unique(builtin[nzchar(builtin)])
+  unique(exclude_dirs[nzchar(exclude_dirs)])
 }
 
 #' Key used in alt-text and sync mapping for images
@@ -70,10 +135,9 @@ prfy_image_key <- function(file_path, root = get_project_dir()) {
 parse_directory_for_images <- function(directory,
                                        recursive = TRUE,
                                        exclude_dirs = default_exclude_dirs()) {
-  log4r::debug(.le$logger, paste("Parsing directory for images:", directory))
+  log4r::debug(.le$logger, paste0("parse_directory_for_images: directory=", directory, ", recursive=", recursive))
 
   if (!dir.exists(directory)) {
-    log4r::error(.le$logger, paste("Directory does not exist:", directory))
     stop("The specified directory does not exist.")
   }
 
@@ -81,7 +145,7 @@ parse_directory_for_images <- function(directory,
 
   # helper: check if any path segment matches excluded dir names
   should_skip <- function(rel_path) {
-    segments <- strsplit(rel_path, .Platform$file.sep, fixed = FALSE)[[1]]
+    segments <- strsplit(rel_path, .Platform$file.sep, fixed = TRUE)[[1]]
     any(segments %in% exclude_dirs)
   }
 
@@ -126,14 +190,10 @@ parse_directory_for_images <- function(directory,
       }
     }
 
-    log4r::debug(.le$logger, paste("Visited", visited_dirs, "directories; skipped", skipped_dirs, "excluded directories"))
+    log4r::debug(.le$logger, paste0("parse_directory_for_images: visited ", visited_dirs, " dirs, skipped ", skipped_dirs, " excluded"))
   }
 
-  log4r::debug(.le$logger, paste("Found", length(image_files), "image file(s)."))
-
-  if (length(image_files) == 0) {
-    log4r::info(.le$logger, "No image files found in the specified directory.")
-  }
+  log4r::debug(.le$logger, paste0("parse_directory_for_images: found ", length(image_files), " image(s) in ", directory))
 
   return(image_files)
 }
@@ -155,19 +215,19 @@ load_image_metadata <- function(image_path) {
   metadata_filename <- paste0(name_parts, "_", ext, "_metadata.json")
   metadata_path <- file.path(file_dir, metadata_filename)
 
-  log4r::debug(.le$logger, paste("Looking for metadata at:", metadata_path))
+  log4r::debug(.le$logger, paste("load_image_metadata: looking for", metadata_path))
 
   if (!file.exists(metadata_path)) {
-    log4r::warn(.le$logger, paste("Metadata file not found:", metadata_path))
+    log4r::debug(.le$logger, paste("load_image_metadata: not found", metadata_path))
     return(NULL)
   }
 
   tryCatch({
     metadata <- jsonlite::read_json(metadata_path)
-    log4r::debug(.le$logger, paste("Loaded metadata from:", metadata_path))
+    log4r::debug(.le$logger, paste("load_image_metadata: loaded", metadata_path))
     return(metadata)
   }, error = function(e) {
-    log4r::error(.le$logger, paste("Error reading metadata file:", metadata_path, "-", e$message))
+    log4r::warn(.le$logger, paste("load_image_metadata: failed to parse", metadata_path, "-", e$message))
     return(NULL)
   })
 }

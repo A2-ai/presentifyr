@@ -13,21 +13,14 @@
 #' }
 sync_images <- function(input_pptx,
                         output_pptx) {
-  log4r::debug(.le$logger, "Starting sync images R function")
+  log4r::debug(.le$logger, paste0("sync_images: input=", input_pptx, ", output=", output_pptx))
 
-  if (!file.exists(input_pptx)) {
-    log4r::error(.le$logger, paste("The input .pptx file does not exist:", input_pptx))
-    stop(paste("The input .pptx file does not exist:", input_pptx))
-  }
-
-  if (!grepl("\\.pptx$", input_pptx, ignore.case = TRUE)) {
-    log4r::error(.le$logger, paste("Invalid file type. Expected a .pptx file:", input_pptx))
-    stop("Invalid file type. Expected a .pptx file.")
-  }
+  validate_pptx_file(input_pptx)
 
   exclude_dirs <- default_exclude_dirs()
 
   root_dir <- get_project_dir()
+  log4r::debug(.le$logger, paste("sync_images: scanning for images in", root_dir))
 
   image_files <- parse_directory_for_images(
     directory = root_dir,
@@ -35,11 +28,10 @@ sync_images <- function(input_pptx,
   )
 
   if (length(image_files) == 0 || all(image_files == "")) {
-    log4r::error(.le$logger, paste("No image files found. Execution halted."))
     stop("No image files found. Execution halted.")
   }
 
-  log4r::debug(.le$logger, paste0("Found ", length(image_files), " image files"))
+  log4r::debug(.le$logger, paste0("sync_images: found ", length(image_files), " image files"))
 
   ## Build keys matching alt-text: prefer project-relative paths; include basename for backward compatibility
   keys_primary <- vapply(image_files, prfy_image_key, character(1), root = root_dir)
@@ -48,30 +40,13 @@ sync_images <- function(input_pptx,
   image_dict <- as.list(stats::setNames(image_files, keys_primary))
   temp_image_dict <- tempfile(fileext = ".json")
   jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
-  log4r::debug(.le$logger, paste("Temporary image dictionary created at:", temp_image_dict))
+  log4r::debug(.le$logger, paste("sync_images: image dictionary written to", temp_image_dict))
 
   script <- system.file("scripts/sync_images.py", package = "presentifyr")
-  args <- c("run", script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict)
 
-  paths <- reportifyr::get_venv_uv_paths()
-  venv_path <- paths$venv
-  uv_path <- paths$uv
-  log4r::debug(.le$logger, paste("venv_path resolved to:", venv_path))
-  log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
-
-  result <- tryCatch({
-    processx::run(
-      command = uv_path,
-      args = args,
-      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
-      error_on_status = TRUE,
-      echo = TRUE,
-    )
-  }, error = function(e) {
-    log4r::error(.le$logger, paste0("Sync images Python script failed. Status: ", e$status))
-    log4r::error(.le$logger, paste0("Sync images Python script failed. Stderr: ", e$stderr))
-    log4r::info(.le$logger, paste0("Sync images Python script failed. Stdout: ", e$stdout))
-    stop(paste("Sync images script failed. Status: ", e$status, "Stderr: ", e$stderr))
-  })
-  log4r::debug(.le$logger, "Exiting sync images R function")
+  result <- run_python_script(
+    script_args = c(script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict),
+    label = "Sync images"
+  )
+  log4r::debug(.le$logger, paste("sync_images: complete, output written to", output_pptx))
 }

@@ -26,20 +26,25 @@ add_images <- function(files, output_pptx,
                        slide_groups = NULL, slide_positions = NULL,
                        font_settings = list()) {
 
-  log4r::debug(.le$logger, "Starting add_images function")
+  log4r::debug(.le$logger, paste0(
+    "add_images: output=", output_pptx,
+    ", files=", length(files),
+    ", layout=", if (is.null(slide_layout_name)) "default" else slide_layout_name,
+    ", template=", if (is.null(base_pptx)) "blank" else base_pptx
+  ))
 
   ## Determine slide groups (backward compat logic stays in R)
   if (is.null(slide_groups)) {
     ## Backward compatibility: one image per slide
     slide_groups <- as.list(files)
     slide_positions <- lapply(slide_groups, function(x) seq_along(x))
-    log4r::debug(.le$logger, "Using single-image mode (one image per slide)")
+    log4r::debug(.le$logger, "add_images: single-image mode (one image per slide)")
   } else {
     ## If positions not provided, default to sequential
     if (is.null(slide_positions)) {
       slide_positions <- lapply(slide_groups, function(x) seq_along(x))
     }
-    log4r::debug(.le$logger, paste("Using grouped mode:", length(slide_groups), "slides"))
+    log4r::debug(.le$logger, paste0("add_images: grouped mode, ", length(slide_groups), " slides"))
   }
 
   ## Pre-compute image keys via prfy_image_key()
@@ -48,6 +53,8 @@ add_images <- function(files, output_pptx,
     vapply(all_files, prfy_image_key, character(1)),
     all_files
   )
+
+  log4r::debug(.le$logger, paste0("add_images: image keys = [", paste(image_keys, collapse = ", "), "]"))
 
   ## Build config for Python script
   config <- list(
@@ -60,36 +67,16 @@ add_images <- function(files, output_pptx,
 
   temp_config <- tempfile(fileext = ".json")
   jsonlite::write_json(config, temp_config, auto_unbox = TRUE, pretty = TRUE, null = "null")
-  log4r::debug(.le$logger, paste("Config JSON written to:", temp_config))
+  log4r::debug(.le$logger, paste("add_images: config JSON written to", temp_config))
 
   script <- system.file("scripts/add_images.py", package = "presentifyr")
-  args <- c("run", script, "-o", output_pptx, "-c", temp_config)
+  script_args <- c(script, "-o", output_pptx, "-c", temp_config)
 
   if (!is.null(base_pptx) && file.exists(base_pptx)) {
-    args <- c(args, "-b", base_pptx)
+    script_args <- c(script_args, "-b", base_pptx)
   }
 
-  paths <- reportifyr::get_venv_uv_paths()
-  venv_path <- paths$venv
-  uv_path <- paths$uv
-  log4r::debug(.le$logger, paste("venv_path resolved to:", venv_path))
-  log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
+  run_python_script(script_args, label = "Add images")
 
-  result <- tryCatch({
-    processx::run(
-      command = uv_path,
-      args = args,
-      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
-      error_on_status = TRUE,
-      echo = TRUE
-    )
-  }, error = function(e) {
-    log4r::error(.le$logger, paste0("Add images Python script failed. Status: ", e$status))
-    log4r::error(.le$logger, paste0("Add images Python script failed. Stderr: ", e$stderr))
-    log4r::info(.le$logger, paste0("Add images Python script failed. Stdout: ", e$stdout))
-    stop(paste("Add images script failed. Status: ", e$status, "Stderr: ", e$stderr))
-  })
-
-  message(sprintf("PowerPoint saved as %s", output_pptx))
-  log4r::info(.le$logger, paste("PowerPoint saved as", output_pptx))
+  log4r::info(.le$logger, paste("add_images: complete, output =", output_pptx))
 }

@@ -2,6 +2,8 @@
 
 #' Updates the logging level for functions. Default is set to WARN
 #'
+#' @return Called for its side effect of updating the logger in `.le$logger`.
+#'   Returns `NULL` invisibly.
 #' @export
 #'
 #' @examples \dontrun{
@@ -12,8 +14,11 @@ toggle_logger <- function() {
 
   LEVEL_NAMES <- c("DEBUG", "INFO", "WARN", "ERROR", "FATAL")
   verbosity <- Sys.getenv("PRFY_VERBOSE", unset = "WARN")
-  if (!(verbosity %in% LEVEL_NAMES)){
-    cat("Invalid verbosity level. Available options are:", paste(LEVEL_NAMES, collapse = ", "), "\n")
+  if (!(verbosity %in% LEVEL_NAMES)) {
+    stop(
+      "Invalid verbosity level '", verbosity, "'. ",
+      "Available options are: ", paste(LEVEL_NAMES, collapse = ", ")
+    )
   }
 
   logger <- log4r::logger(verbosity, appenders = log4r::console_appender(my_layout))

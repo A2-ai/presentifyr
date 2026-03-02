@@ -6,6 +6,10 @@
 \usage{
 app()
 }
+\value{
+This function does not return; it runs the Shiny app until the
+session is ended.
+}
 \description{
 This function launches the Shiny application.
 }

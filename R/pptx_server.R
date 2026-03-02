@@ -11,7 +11,7 @@ pptx_server <- function(id) {
   shiny::moduleServer(
     id,
     function(input, output, session) {
-      log4r::debug(.le$logger, "pptx_server module started")
+      log4r::debug(.le$logger, paste("pptx_server: module started, id =", id))
       ns <- shiny::NS(id)
       default_footnote_font <- list(
         font_name      = "Calibri",
@@ -71,7 +71,7 @@ pptx_server <- function(id) {
       # 1. Create configs modal for uploading & configuring PPTX
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$configs, {
-        log4r::info(.le$logger, "Opening Configuration Modal")
+        log4r::debug(.le$logger, "pptx_server: opening config modal")
         showConfigModal()
       })
 
@@ -108,6 +108,17 @@ pptx_server <- function(id) {
 
       shiny::observeEvent(input$close_configs, {
         persist_footnote_font_inputs()
+        fs <- rv$footnote_font
+        style_flags <- c(
+          if (isTRUE(fs$bold)) "Bold",
+          if (isTRUE(fs$italic)) "Italic",
+          if (isTRUE(fs$underline)) "Underline"
+        )
+        style_text <- if (length(style_flags) > 0) paste(style_flags, collapse = "+") else "Regular"
+        log4r::info(.le$logger, paste0(
+          "pptx_server: config saved, footnote font = ",
+          fs$font_name, " ", fs$font_size, "pt ", style_text, " ", fs$font_color
+        ))
         shiny::removeModal()
       })
 
@@ -149,6 +160,9 @@ pptx_server <- function(id) {
 
       shiny::observeEvent(input$pptx_filename, {
         rv$report_filename <- trimws(input$pptx_filename)
+        if (nzchar(rv$report_filename)) {
+          log4r::info(.le$logger, paste("pptx_server: output filename set to", rv$report_filename))
+        }
       })
 
       ## Render filename label separately so it doesn't affect template upload
@@ -193,7 +207,7 @@ pptx_server <- function(id) {
       # 2. UI for file input, template confirmation, layout selection
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$configs_options <- shiny::renderUI({
-        log4r::info(.le$logger, "Rendering UI for PPTX configuration & layout selection")
+        log4r::debug(.le$logger, "pptx_server: rendering config UI")
 
         ## Force fileInput re-render when key changes (e.g., after clearing template)
         file_key <- rv$file_input_key
@@ -228,7 +242,7 @@ pptx_server <- function(id) {
         if (!is.null(rv$selected_layout_name)) {
           layout_label <- htmltools::tags$p(
             style = "font-weight:bold; color:#e45600; margin-top:5px;",
-            paste("Selected layout:", rv$selected_layout_name)
+            paste("Selected layout:", rv$original_layout_name)
           )
         }
 
@@ -264,6 +278,7 @@ pptx_server <- function(id) {
         total <- nrow(rv$extracted_layouts)
 
         layout_name <- rv$extracted_layouts$layout_name[idx]
+        display_name <- rv$extracted_layouts$original_name[idx]
         image_path <- rv$extracted_layouts$image_path[idx]
         placeholder_count <- rv$extracted_layouts$placeholder_count[idx]
 
@@ -295,7 +310,7 @@ pptx_server <- function(id) {
             htmltools::tags$img(src = image_path, class = "layout-carousel-img"),
             htmltools::tags$div(
               class = "layout-carousel-info",
-              htmltools::tags$div(class = "layout-carousel-name", layout_name),
+              htmltools::tags$div(class = "layout-carousel-name", display_name),
               htmltools::tags$span(
                 class = "layout-carousel-slots",
                 paste(placeholder_count, ifelse(placeholder_count == 1, "slot", "slots"))
@@ -334,7 +349,8 @@ pptx_server <- function(id) {
       shiny::observeEvent(input$layout_select_btn, {
         shiny::req(rv$extracted_layouts)
         rv$selected_layout_name <- rv$extracted_layouts$layout_name[rv$layout_index]
-        log4r::info(.le$logger, paste0("User selected layout: ", rv$selected_layout_name))
+        rv$original_layout_name <- rv$extracted_layouts$original_name[rv$layout_index]
+        log4r::info(.le$logger, paste0("pptx_server: layout selected = ", rv$original_layout_name))
       })
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -402,24 +418,20 @@ pptx_server <- function(id) {
         rv$uploaded_template <- input[[file_input_id]]
 
         if (is.null(rv$uploaded_template)) {
-          log4r::error(.le$logger, "No template PPTX file was uploaded")
-          shiny::showModal(shiny::modalDialog(
-            title = "Error",
-            "No template file was uploaded. A blank template will be used instead.",
-            footer = shiny::modalButton("Close")
-          ))
+          log4r::warn(.le$logger, "pptx_server: template submit with no file uploaded")
+          show_error_modal("No template file was uploaded. A blank template will be used instead.")
           return()
         }
 
         base_pptx <- rv$uploaded_template$datapath
-        log4r::debug(.le$logger, paste0("Template uploaded: ", base_pptx))
+        log4r::debug(.le$logger, paste0("pptx_server: template uploaded = ", base_pptx))
 
         output_dir <- file.path(tempdir(), "prfy_layouts")
         dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
         ## Clean old layout files before extracting new ones
         old_files <- list.files(output_dir, full.names = TRUE)
         if (length(old_files) > 0) unlink(old_files, force = TRUE)
-        log4r::debug(.le$logger, paste0("Temporary output directory: ", output_dir))
+        log4r::debug(.le$logger, paste0("pptx_server: layout output dir = ", output_dir))
 
         tryCatch({
           layouts_df <- extract_layouts(base_pptx, output_dir)
@@ -428,15 +440,11 @@ pptx_server <- function(id) {
           layouts_df$image_path <- file.path("pptx_layouts", basename(layouts_df$image_path))
 
           rv$extracted_layouts <- layouts_df
-          log4r::info(.le$logger, paste0("Extracted ", nrow(layouts_df), " layouts from template"))
+          log4r::info(.le$logger, paste0("pptx_server: extracted ", nrow(layouts_df), " layouts from template"))
 
         }, error = function(e) {
-          log4r::error(.le$logger, paste0("Error extracting layouts: ", e$message))
-          shiny::showModal(shiny::modalDialog(
-            title = "Error",
-            paste("An error occurred while extracting layouts:", e$message),
-            footer = shiny::modalButton("Close")
-          ))
+          log4r::error(.le$logger, paste0("pptx_server: extract_layouts failed: ", e$message))
+          show_error_modal(paste("An error occurred while extracting layouts:", e$message))
         })
       })
 
@@ -445,7 +453,7 @@ pptx_server <- function(id) {
       # 5. Clear template logic + return to configs modal
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$clear_template, {
-        log4r::info(.le$logger, "Clearing template")
+        log4r::debug(.le$logger, "pptx_server: clearing template")
         shiny::showModal(shiny::modalDialog(
           title = "Clear Template",
           "Are you sure you want to clear the current template and use a blank template?",
@@ -459,13 +467,13 @@ pptx_server <- function(id) {
       shiny::observeEvent(input$confirm_clear, {
         if (!is.null(rv$uploaded_template) && file.exists(rv$uploaded_template$datapath)) {
           file.remove(rv$uploaded_template$datapath)
-          log4r::info(.le$logger, "Template file removed")
+          log4r::debug(.le$logger, "pptx_server: template file removed")
         }
 
         layout_dir <- file.path(tempdir(), "prfy_layouts")
         if (dir.exists(layout_dir)) {
           unlink(layout_dir, recursive = TRUE, force = TRUE)
-          log4r::debug(.le$logger, paste("Removed layout directory:", layout_dir))
+          log4r::debug(.le$logger, paste("pptx_server: removed layout dir", layout_dir))
         }
 
         shiny::removeResourcePath("pptx_layouts")
@@ -473,6 +481,7 @@ pptx_server <- function(id) {
         rv$uploaded_template <- NULL
         rv$extracted_layouts <- NULL
         rv$selected_layout_name <- NULL
+        rv$original_layout_name <- NULL
         rv$file_input_key <- rv$file_input_key + 1L  ## Force fileInput to re-render with new ID
 
         shiny::removeModal()
@@ -495,7 +504,7 @@ pptx_server <- function(id) {
       # 6. Create sync modal for uploading & syncing PPTX
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$sync, {
-        log4r::info(.le$logger, "Opening Sync Modal")
+        log4r::debug(.le$logger, "pptx_server: opening sync modal")
         shiny::showModal(shiny::modalDialog(
           title = "Sync Images",
           htmltools::tags$p("Use this menu to sync your PowerPoint with a local repository."),
@@ -505,7 +514,7 @@ pptx_server <- function(id) {
       })
 
       shiny::observeEvent(input$open_upload_sync, {
-        log4r::info(.le$logger, "Opening Upload Modal for Sync Modal")
+        log4r::debug(.le$logger, "pptx_server: opening sync upload modal")
         shiny::removeModal()
         shiny::showModal(shiny::modalDialog(
           title = "Upload PowerPoint for Syncing",
@@ -521,21 +530,17 @@ pptx_server <- function(id) {
       })
 
       shiny::observeEvent(input$submit_sync_file, {
-        log4r::info(.le$logger, "Processing submitted PPTX for syncing")
+        log4r::info(.le$logger, "pptx_server: processing PPTX for sync")
         rv$uploaded_file <- input$uploaded_sync_file
 
         if (is.null(rv$uploaded_file)) {
-          log4r::error(.le$logger, "No PPTX file uploaded for syncing")
-          shiny::showModal(shiny::modalDialog(
-            title = "Error",
-            "No PowerPoint file was uploaded for syncing. Please try again.",
-            footer = shiny::modalButton("Close")
-          ))
+          log4r::warn(.le$logger, "pptx_server: sync submit with no file uploaded")
+          show_error_modal("No PowerPoint file was uploaded for syncing. Please try again.")
           return()
         }
 
         input_pptx <- rv$uploaded_file$datapath
-        log4r::debug(.le$logger, paste0("Input PPTX file: ", input_pptx))
+        log4r::debug(.le$logger, paste0("pptx_server: sync input = ", input_pptx))
 
         output_pptx <- tempfile(fileext = ".pptx")
 
@@ -547,6 +552,7 @@ pptx_server <- function(id) {
 
         tryCatch({
           sync_images(input_pptx, output_pptx)
+          log4r::info(.le$logger, "pptx_server: sync completed successfully")
 
           rv$processed_file <- output_pptx
 
@@ -565,17 +571,13 @@ pptx_server <- function(id) {
             },
             content = function(file) {
               file.copy(rv$processed_file, file)
-              log4r::info(.le$logger, "Downloading synced PPTX file")
+              log4r::info(.le$logger, paste("pptx_server: downloading synced PPTX", basename(rv$uploaded_file$name)))
             }
           )
 
         }, error = function(e) {
-          log4r::error(.le$logger, paste0("Error processing PPTX file: ", e$message))
-          shiny::showModal(shiny::modalDialog(
-            title = "Error",
-            paste("An error occurred while processing your file:", e$message),
-            footer = shiny::modalButton("Close")
-          ))
+          log4r::error(.le$logger, paste0("pptx_server: sync failed: ", e$message))
+          show_error_modal(paste("An error occurred while processing your file:", e$message))
         })
       })
 
@@ -608,9 +610,8 @@ pptx_server <- function(id) {
       # 7a. Preview modal for slide arrangement
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$preview_slides, {
-        log4r::info(.le$logger, "Opening slide preview modal")
-
         selected <- selected_items()
+        log4r::info(.le$logger, paste0("pptx_server: preview requested, ", length(selected), " files selected"))
         ## selected_items() returns list of lists with 'path' element - extract and make absolute
         files <- vapply(selected, function(item) {
           f <- if (is.list(item)) item$path else item
@@ -635,9 +636,7 @@ pptx_server <- function(id) {
         ## Determine placeholder count from selected layout
         placeholder_count <- 1L
         if (!is.null(rv$extracted_layouts) && !is.null(rv$selected_layout_name)) {
-          ## Convert selected layout name to safe name for lookup
-          safe_name <- gsub("[^\\w\\-_]", "_", rv$selected_layout_name, perl = TRUE)
-          layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == safe_name, ]
+          layout_row <- rv$extracted_layouts[rv$extracted_layouts$layout_name == rv$selected_layout_name, ]
           if (nrow(layout_row) > 0 && !is.na(layout_row$placeholder_count[1])) {
             placeholder_count <- layout_row$placeholder_count[1]
           }
@@ -645,26 +644,12 @@ pptx_server <- function(id) {
         rv$placeholder_count <- placeholder_count
 
         ## Create initial slide groups (auto-distribute)
-        n_files <- length(files)
-        n_slides <- ceiling(n_files / placeholder_count)
+        result <- distribute_files_to_slides(files, placeholder_count)
+        rv$slide_groups <- result$groups
+        rv$slide_positions <- result$positions
 
-        slide_groups <- vector("list", n_slides)
-        slide_positions <- vector("list", n_slides)
-        for (i in seq_along(files)) {
-          slide_idx <- ceiling(i / placeholder_count)
-          if (is.null(slide_groups[[slide_idx]])) {
-            slide_groups[[slide_idx]] <- character(0)
-            slide_positions[[slide_idx]] <- integer(0)
-          }
-          slide_groups[[slide_idx]] <- c(slide_groups[[slide_idx]], files[i])
-          ## Default position: 1, 2, 3... in order
-          pos_in_slide <- length(slide_groups[[slide_idx]])
-          slide_positions[[slide_idx]] <- c(slide_positions[[slide_idx]], pos_in_slide)
-        }
-        rv$slide_groups <- slide_groups
-        rv$slide_positions <- slide_positions
-
-        log4r::debug(.le$logger, paste("Preview:", n_files, "files,", placeholder_count, "placeholders,", n_slides, "slides"))
+        n_slides <- length(result$groups)
+        log4r::debug(.le$logger, paste0("pptx_server: preview ", length(files), " files, ", placeholder_count, " placeholders, ", n_slides, " slides"))
 
         showPreviewModal(placeholder_count)
       })
@@ -766,7 +751,7 @@ pptx_server <- function(id) {
           paste0("preview_imgs_", dir_idx, "/", basename(file_path))
         } else {
           ## Fallback - shouldn't happen if paths are set up correctly
-          log4r::warn(.le$logger, paste("Could not find resource path for:", file_path))
+          log4r::warn(.le$logger, paste("pptx_server: no resource path for", file_path))
           ""
         }
       }
@@ -920,23 +905,31 @@ pptx_server <- function(id) {
               shiny::observeEvent(input[[paste0("move_up_", idx)]], {
                 if (idx > 1) {
                   files <- unlist(rv$slide_groups)
+                  log4r::info(.le$logger, paste0("pptx_server: move up image ", idx, " (", basename(files[idx]), ")"))
                   files[c(idx - 1, idx)] <- files[c(idx, idx - 1)]
-                  rv$slide_groups <- regroup_files(files, rv$slide_groups)
+                  result <- regroup_files(files, rv$slide_groups)
+                  rv$slide_groups <- result$groups
+                  rv$slide_positions <- result$positions
                 }
               }, ignoreInit = TRUE)
 
               shiny::observeEvent(input[[paste0("move_down_", idx)]], {
                 files <- unlist(rv$slide_groups)
                 if (idx < length(files)) {
+                  log4r::info(.le$logger, paste0("pptx_server: move down image ", idx, " (", basename(files[idx]), ")"))
                   files[c(idx, idx + 1)] <- files[c(idx + 1, idx)]
-                  rv$slide_groups <- regroup_files(files, rv$slide_groups)
+                  result <- regroup_files(files, rv$slide_groups)
+                  rv$slide_groups <- result$groups
+                  rv$slide_positions <- result$positions
                 }
               }, ignoreInit = TRUE)
 
               ## Split before: this image and everything after moves to new slide
               shiny::observeEvent(input[[paste0("split_before_", idx)]], {
-                ## Find which slide this index is in and split it
-                rv$slide_groups <- split_before_index(rv$slide_groups, idx)
+                log4r::info(.le$logger, paste0("pptx_server: split before image ", idx, ", slides ", length(rv$slide_groups), " -> ", length(rv$slide_groups) + 1))
+                result <- split_before_index(rv$slide_groups, rv$slide_positions, idx)
+                rv$slide_groups <- result$groups
+                rv$slide_positions <- result$positions
               }, ignoreInit = TRUE)
             })
             .created_obs$move <- c(.created_obs$move, i)
@@ -955,6 +948,7 @@ pptx_server <- function(id) {
 
               shiny::observeEvent(input[[paste0("merge_slide_", slide_idx)]], {
                 if (slide_idx < length(rv$slide_groups)) {
+                  log4r::info(.le$logger, paste0("pptx_server: merge slide ", slide_idx, " with ", slide_idx + 1, ", slides ", length(rv$slide_groups), " -> ", length(rv$slide_groups) - 1))
                   result <- merge_slides(rv$slide_groups, rv$slide_positions, slide_idx)
                   rv$slide_groups <- result$groups
                   rv$slide_positions <- result$positions
@@ -981,6 +975,7 @@ pptx_server <- function(id) {
                   pos <- p
 
                   shiny::observeEvent(input[[paste0("pos_", slide_idx, "_", file_idx, "_", pos)]], {
+                    log4r::info(.le$logger, paste0("pptx_server: slot change, slide ", slide_idx, " image ", file_idx, " -> slot ", pos))
                     rv$slide_positions[[slide_idx]][file_idx] <- pos
                   }, ignoreInit = TRUE)
                 })
@@ -991,118 +986,23 @@ pptx_server <- function(id) {
         }
       })
 
-      ## Helper to regroup files maintaining slide sizes (also resets positions)
-      regroup_files <- function(files, current_groups) {
-        sizes <- lengths(current_groups)
-        new_groups <- vector("list", length(sizes))
-        new_positions <- vector("list", length(sizes))
-        file_idx <- 1
-        for (i in seq_along(sizes)) {
-          new_groups[[i]] <- files[file_idx:(file_idx + sizes[i] - 1)]
-          ## Reset positions to 1, 2, 3... when reordering
-          new_positions[[i]] <- seq_len(sizes[i])
-          file_idx <- file_idx + sizes[i]
-        }
-        rv$slide_positions <- new_positions
-        new_groups
-      }
-
-      ## Helper to split slides BEFORE a global file index
-      ## "Split before" semantics: this image and everything after moves to new slide
-      split_before_index <- function(groups, global_idx) {
-        cumulative <- cumsum(lengths(groups))
-
-        ## Find which slide contains this index
-        slide_idx <- which(cumulative >= global_idx)[1]
-        prior <- if (slide_idx == 1) 0 else cumulative[slide_idx - 1]
-        local_idx <- global_idx - prior
-
-        ## Split the slide: before gets images 1 to local_idx-1, after gets local_idx to end
-        slide_files <- groups[[slide_idx]]
-        before_files <- slide_files[seq_len(local_idx - 1)]
-        after_files <- slide_files[local_idx:length(slide_files)]
-
-        ## Rebuild groups
-        new_groups <- list()
-        new_positions <- list()
-
-        if (slide_idx > 1) {
-          new_groups <- groups[seq_len(slide_idx - 1)]
-          new_positions <- rv$slide_positions[seq_len(slide_idx - 1)]
-        }
-
-        ## Add before_files (will have at least 1 image since button only shows for file_idx > 1)
-        new_groups <- c(new_groups, list(before_files))
-        new_positions <- c(new_positions, list(seq_len(length(before_files))))
-
-        ## Add after_files (this image and any following in the same slide)
-        new_groups <- c(new_groups, list(after_files))
-        new_positions <- c(new_positions, list(seq_len(length(after_files))))
-
-        ## Add remaining slides
-        if (slide_idx < length(groups)) {
-          new_groups <- c(new_groups, groups[(slide_idx + 1):length(groups)])
-          new_positions <- c(new_positions, rv$slide_positions[(slide_idx + 1):length(groups)])
-        }
-
-        rv$slide_positions <- new_positions
-        new_groups
-      }
-
-      ## Helper to merge slide with next
-      merge_slides <- function(groups, positions, slide_idx) {
-        if (slide_idx >= length(groups)) {
-          return(list(groups = groups, positions = positions))
-        }
-
-        merged_files <- c(groups[[slide_idx]], groups[[slide_idx + 1]])
-        ## Reassign positions sequentially when merging
-        merged_positions <- seq_len(length(merged_files))
-
-        new_groups <- list()
-        new_positions <- list()
-
-        if (slide_idx > 1) {
-          new_groups <- groups[seq_len(slide_idx - 1)]
-          new_positions <- positions[seq_len(slide_idx - 1)]
-        }
-
-        new_groups <- c(new_groups, list(merged_files))
-        new_positions <- c(new_positions, list(merged_positions))
-
-        if (slide_idx + 1 < length(groups)) {
-          new_groups <- c(new_groups, groups[(slide_idx + 2):length(groups)])
-          new_positions <- c(new_positions, positions[(slide_idx + 2):length(groups)])
-        }
-
-        list(groups = new_groups, positions = new_positions)
-      }
-
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 7b. Download handler (now triggered from preview modal)
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       output$download <- shiny::downloadHandler(
         filename = function() {
-          base <- rv$report_filename
-          if (is.null(base) || base == "") {
-            "report.pptx"
-          } else {
-            base <- gsub("[^[:alnum:]_ -]", "_", base)
-            if (!grepl("\\.pptx$", base, ignore.case = TRUE))
-              base <- paste0(base, ".pptx")
-            base
-          }
+          sanitize_filename(rv$report_filename)
         },
         content = function(file) {
           temp_pptx <- tempfile(fileext = ".pptx")
 
           shiny::removeModal()
           shiny::showModal(shiny::modalDialog("Creating slides for PowerPoint . . .", footer = NULL))
-          log4r::info(.le$logger, "Starting PowerPoint creation process")
+          log4r::info(.le$logger, "pptx_server: starting PowerPoint creation")
 
           base_pptx <- if (!is.null(rv$uploaded_template)) rv$uploaded_template$datapath
 
-          chosen_layout <- rv$selected_layout_name
+          chosen_layout <- rv$original_layout_name
 
           tryCatch({
             start_time <- Sys.time()
@@ -1119,7 +1019,7 @@ pptx_server <- function(id) {
 
             file.copy(temp_pptx, file)
             elapsed_time <- Sys.time() - start_time
-            log4r::info(.le$logger, sprintf("PowerPoint successfully created and downloaded in %.2f seconds.", elapsed_time))
+            log4r::info(.le$logger, sprintf("pptx_server: PowerPoint created and downloaded in %.2f seconds", elapsed_time))
 
             shiny::showModal(shiny::modalDialog(
               title = "Success",
@@ -1127,12 +1027,8 @@ pptx_server <- function(id) {
               footer = shiny::modalButton("Close")
             ))
           }, error = function(e) {
-            log4r::error(.le$logger, paste0("Error creating PPTX: ", e$message))
-            shiny::showModal(shiny::modalDialog(
-              title = "Error",
-              paste("An error occurred while creating the PowerPoint:", e$message),
-              footer = shiny::modalButton("Close")
-            ))
+            log4r::error(.le$logger, paste0("pptx_server: add_images failed: ", e$message))
+            show_error_modal(paste("An error occurred while creating the PowerPoint:", e$message))
           }, finally = {
             on.exit({
               if (file.exists(temp_pptx)) file.remove(temp_pptx)
@@ -1229,7 +1125,7 @@ pptx_server <- function(id) {
                 htmltools::tags$img(src = image_path),
                 htmltools::tags$div(
                   class = "layout-caption",
-                  htmltools::tags$span(class = "layout-name", rv$selected_layout_name),
+                  htmltools::tags$span(class = "layout-name", rv$original_layout_name),
                   slot_badge
                 )
               )
@@ -1304,7 +1200,7 @@ pptx_server <- function(id) {
 
         htmltools::tagList(pptx_details, file_list)
       })
-      log4r::debug(.le$logger, "pptx_server module loaded successfully")
+      log4r::debug(.le$logger, "pptx_server: module loaded")
 
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 8. Session close + clear layouts
@@ -1313,21 +1209,21 @@ pptx_server <- function(id) {
         layout_dir <- file.path(tempdir(), "prfy_layouts")
         if (dir.exists(layout_dir)) {
           unlink(layout_dir, recursive = TRUE, force = TRUE)
-          log4r::info(.le$logger, paste("Session ended, removed layout directory:", layout_dir))
+          log4r::debug(.le$logger, paste("pptx_server: session cleanup, removed layout dir", layout_dir))
         }
 
         if ("pptx_layouts" %in% names(shiny::resourcePaths())) {
           shiny::removeResourcePath("pptx_layouts")
         }
 
-        ## Clean up preview image resource paths
+        ## Clean up preview and filelist image resource paths
         resource_paths <- names(shiny::resourcePaths())
-        preview_paths <- resource_paths[grepl("^preview_imgs_", resource_paths)]
-        for (path_name in preview_paths) {
+        dynamic_paths <- resource_paths[grepl("^(preview_imgs_|filelist_imgs_)", resource_paths)]
+        for (path_name in dynamic_paths) {
           shiny::removeResourcePath(path_name)
         }
 
-        log4r::info(.le$logger, "Session ended, removed resource paths")
+        log4r::debug(.le$logger, paste("pptx_server: session cleanup, removed", length(dynamic_paths), "resource paths"))
       })
     }
   )
@@ -1335,6 +1231,6 @@ pptx_server <- function(id) {
 
 #' @noRd
 app_server <- function(input, output, session) {
-  log4r::info(.le$logger, "Initializing app server")
+  log4r::info(.le$logger, "app_server: initializing")
   pptx_server(id="app")
 }

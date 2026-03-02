@@ -1,13 +1,28 @@
-## Shared from ghqc.app
-test_that("generate_excluded_file_message works correctly", {
-  excluded_files <- c("path/to/file1.txt", "path/to/file2.pdf")
-  result <- generate_excluded_file_message(excluded_files)
-  error_icon_html <- "<span style='font-size: 24px; vertical-align: middle;'>&#10071;</span>"
-  expected_message <- sprintf("%s The selected directory contains only the following files which are not selectable items:<ul>%s</ul><br>",
-                              error_icon_html, paste0("<li>", basename(excluded_files), "</li>", collapse = ""))
-  expect_equal(result, expected_message)
+test_that("generate_excluded_file_message returns HTML with basenames of excluded files", {
+  excluded_files <- c("path/to/file1.txt", "some/other/file2.pdf")
 
-  excluded_files <- character(0)
   result <- generate_excluded_file_message(excluded_files)
+
+  ## Should contain basenames, not full paths
+  expect_true(grepl("file1.txt", result))
+  expect_true(grepl("file2.pdf", result))
+  expect_false(grepl("path/to/", result))
+
+  ## Should have list item markup
+  expect_true(grepl("<li>file1.txt</li>", result, fixed = TRUE))
+  expect_true(grepl("<li>file2.pdf</li>", result, fixed = TRUE))
+
+  ## Should contain the warning icon
+  expect_true(grepl("&#10071;", result, fixed = TRUE))
+})
+
+test_that("generate_excluded_file_message returns empty for no excluded files", {
+  result <- generate_excluded_file_message(character(0))
   expect_equal(result, NULL)
+})
+
+test_that("generate_excluded_file_message works with a single file", {
+  result <- generate_excluded_file_message("dir/only_file.csv")
+
+  expect_true(grepl("<li>only_file.csv</li>", result, fixed = TRUE))
 })

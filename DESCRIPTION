@@ -30,10 +30,12 @@ Imports:
     pkglite (>= 0.2.2),
     processx (>= 3.8.4),
     reportifyr,
+    rlang,
     shiny (>= 1.8.1.1),
     stats
 Suggests:
     mockery (>= 0.4.4),
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    withr
 Config/testthat/edition: 3
 LazyData: true

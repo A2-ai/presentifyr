@@ -6,6 +6,10 @@
 \usage{
 toggle_logger()
 }
+\value{
+Called for its side effect of updating the logger in \code{.le$logger}.
+Returns \code{NULL} invisibly.
+}
 \description{
 Updates the logging level for functions. Default is set to WARN
 }

@@ -403,8 +403,7 @@ def add_images(output_pptx, config, base_pptx=None):
                     logger.debug(f"Added combined notes for slide {slide_idx}")
 
     prs.save(output_pptx)
-    logger.debug(f"PowerPoint saved as {output_pptx}")
-    print(f"PowerPoint saved as {output_pptx}")
+    logger.info(f"PowerPoint saved as {output_pptx}")
 
 
 if __name__ == "__main__":

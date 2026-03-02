@@ -45,6 +45,8 @@ initialize_app <- function(
     errors = character(0)
   )
 
+  log4r::info(.le$logger, paste("initialize_app: starting, project_dir =", project_dir))
+
   # Track whether components were already present
   reportifyr_already <- FALSE
   pptx_already <- FALSE
@@ -182,6 +184,11 @@ initialize_app <- function(
   }
 
   message(strrep("\u2500", getOption("width", 80)), "\n")
+
+  log4r::info(.le$logger, paste0(
+    "initialize_app: complete, reportifyr=", status$reportifyr,
+    ", python_pptx=", status$python_pptx
+  ))
 
   # Return status invisibly
   invisible(status)
