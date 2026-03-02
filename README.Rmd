@@ -19,10 +19,11 @@ knitr::opts_chunk$set(
 [![R-CMD-check](https://github.com/A2-ai/presentifyr/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/A2-ai/presentifyr/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
- `presentifyr` is a Shiny application that builds PowerPoint presentations from                                                                                                                               
-  R-generated figures. Select images from your project, choose a slide layout from                                                                                                                             
-  your own template, configure footnote styling, and generate a `.pptx` in a matter of seconds. 
-  When figures or footnotes change between review rounds, sync and rebuild the deck with a click of a button.  
+`presentifyr` is a Shiny application that builds PowerPoint presentations from R-generated 
+figures. Select images from your project, choose slide layouts from your template, 
+configure footnote styling, and generate a polished .pptx in seconds. When figures 
+or footnotes change between review rounds, use the built-in sync workflow to quickly 
+rebuild the deck with up-to-date content.
 
 ## Prerequisites
 
