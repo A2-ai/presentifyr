@@ -13,7 +13,7 @@ presentations from R-generated figures. Select images from your project,
 choose slide layouts from your template, configure footnote styling, and
 generate a polished .pptx in seconds. When figures or footnotes change
 between review rounds, use the built-in sync workflow to quickly rebuild
-the deck.
+the deck with up-to-date content.
 
 ## Prerequisites
 
