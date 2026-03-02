@@ -30,6 +30,7 @@ Imports:
     pkglite (>= 0.2.2),
     processx (>= 3.8.4),
     reportifyr,
+    rlang,
     shiny (>= 1.8.1.1),
     stats
 Suggests:
