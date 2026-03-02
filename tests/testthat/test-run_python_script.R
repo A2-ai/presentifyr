@@ -50,7 +50,7 @@ test_that("run_python_script sets VIRTUAL_ENV and PY_LOG_LEVEL in env", {
   expect_equal(captured_env[["PY_LOG_LEVEL"]], "DEBUG")
 })
 
-test_that("run_python_script includes label and status in error on Python failure", {
+test_that("run_python_script error includes label but not internal paths", {
   mockery::stub(run_python_script, "reportifyr::get_venv_uv_paths", function() {
     list(venv = "/fake/venv", uv = "/fake/uv")
   })
@@ -58,21 +58,25 @@ test_that("run_python_script includes label and status in error on Python failur
     e <- simpleError("process failed")
     e$status <- 1
     e$stdout <- "some output"
-    e$stderr <- "traceback here"
+    e$stderr <- "/Users/secret/.venv/bin/python traceback here"
     stop(e)
   })
 
   expect_error(
     run_python_script(c("script.py"), label = "Add images"),
-    "Add images script failed"
+    "Add images failed"
   )
+  ## Stderr and internal paths must NOT leak into the user-facing error
   expect_error(
     run_python_script(c("script.py"), label = "Add images"),
-    "Status:.*1"
+    "PRFY_VERBOSE=DEBUG"
   )
-  expect_error(
+  tryCatch(
     run_python_script(c("script.py"), label = "Add images"),
-    "Stderr:.*traceback here"
+    error = function(e) {
+      expect_false(grepl("/Users/", e$message))
+      expect_false(grepl("traceback", e$message))
+    }
   )
 })
 

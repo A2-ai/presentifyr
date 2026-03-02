@@ -26,20 +26,25 @@ add_images <- function(files, output_pptx,
                        slide_groups = NULL, slide_positions = NULL,
                        font_settings = list()) {
 
-  log4r::debug(.le$logger, "Starting add_images function")
+  log4r::debug(.le$logger, paste0(
+    "add_images: output=", output_pptx,
+    ", files=", length(files),
+    ", layout=", if (is.null(slide_layout_name)) "default" else slide_layout_name,
+    ", template=", if (is.null(base_pptx)) "blank" else base_pptx
+  ))
 
   ## Determine slide groups (backward compat logic stays in R)
   if (is.null(slide_groups)) {
     ## Backward compatibility: one image per slide
     slide_groups <- as.list(files)
     slide_positions <- lapply(slide_groups, function(x) seq_along(x))
-    log4r::debug(.le$logger, "Using single-image mode (one image per slide)")
+    log4r::debug(.le$logger, "add_images: single-image mode (one image per slide)")
   } else {
     ## If positions not provided, default to sequential
     if (is.null(slide_positions)) {
       slide_positions <- lapply(slide_groups, function(x) seq_along(x))
     }
-    log4r::debug(.le$logger, paste("Using grouped mode:", length(slide_groups), "slides"))
+    log4r::debug(.le$logger, paste0("add_images: grouped mode, ", length(slide_groups), " slides"))
   }
 
   ## Pre-compute image keys via prfy_image_key()
@@ -60,7 +65,7 @@ add_images <- function(files, output_pptx,
 
   temp_config <- tempfile(fileext = ".json")
   jsonlite::write_json(config, temp_config, auto_unbox = TRUE, pretty = TRUE, null = "null")
-  log4r::debug(.le$logger, paste("Config JSON written to:", temp_config))
+  log4r::debug(.le$logger, paste("add_images: config JSON written to", temp_config))
 
   script <- system.file("scripts/add_images.py", package = "presentifyr")
   script_args <- c(script, "-o", output_pptx, "-c", temp_config)
@@ -71,5 +76,5 @@ add_images <- function(files, output_pptx,
 
   result <- run_python_script(script_args, label = "Add images")
 
-  log4r::info(.le$logger, paste("PowerPoint saved as", output_pptx))
+  log4r::info(.le$logger, paste("add_images: PowerPoint saved as", output_pptx))
 }

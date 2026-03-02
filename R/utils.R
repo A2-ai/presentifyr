@@ -42,8 +42,8 @@ run_python_script <- function(script_args, label) {
   paths <- reportifyr::get_venv_uv_paths()
   venv_path <- paths$venv
   uv_path <- paths$uv
-  log4r::debug(.le$logger, paste("venv_path resolved to:", venv_path))
-  log4r::debug(.le$logger, paste("uv path resolved to:", uv_path))
+  log4r::debug(.le$logger, paste("run_python_script: venv =", venv_path))
+  log4r::debug(.le$logger, paste("run_python_script: uv =", uv_path))
 
   args <- c("run", script_args)
 
@@ -59,7 +59,7 @@ run_python_script <- function(script_args, label) {
     log4r::error(.le$logger, paste0(label, " Python script failed. Status: ", e$status))
     log4r::error(.le$logger, paste0(label, " Python script failed. Stderr: ", e$stderr))
     log4r::debug(.le$logger, paste0(label, " Python script failed. Stdout: ", e$stdout))
-    stop(paste(label, "script failed. Status: ", e$status, "Stderr: ", e$stderr))
+    stop(paste0(label, " failed. Set PRFY_VERBOSE=DEBUG for details."))
   })
 }
 
@@ -135,7 +135,7 @@ prfy_image_key <- function(file_path, root = get_project_dir()) {
 parse_directory_for_images <- function(directory,
                                        recursive = TRUE,
                                        exclude_dirs = default_exclude_dirs()) {
-  log4r::debug(.le$logger, paste("Parsing directory for images:", directory))
+  log4r::debug(.le$logger, paste0("parse_directory_for_images: directory=", directory, ", recursive=", recursive))
 
   if (!dir.exists(directory)) {
     stop("The specified directory does not exist.")
@@ -190,14 +190,10 @@ parse_directory_for_images <- function(directory,
       }
     }
 
-    log4r::debug(.le$logger, paste("Visited", visited_dirs, "directories; skipped", skipped_dirs, "excluded directories"))
+    log4r::debug(.le$logger, paste0("parse_directory_for_images: visited ", visited_dirs, " dirs, skipped ", skipped_dirs, " excluded"))
   }
 
-  log4r::debug(.le$logger, paste("Found", length(image_files), "image file(s)."))
-
-  if (length(image_files) == 0) {
-    log4r::debug(.le$logger, "No image files found in the specified directory.")
-  }
+  log4r::debug(.le$logger, paste0("parse_directory_for_images: found ", length(image_files), " image(s) in ", directory))
 
   return(image_files)
 }
@@ -219,19 +215,19 @@ load_image_metadata <- function(image_path) {
   metadata_filename <- paste0(name_parts, "_", ext, "_metadata.json")
   metadata_path <- file.path(file_dir, metadata_filename)
 
-  log4r::debug(.le$logger, paste("Looking for metadata at:", metadata_path))
+  log4r::debug(.le$logger, paste("load_image_metadata: looking for", metadata_path))
 
   if (!file.exists(metadata_path)) {
-    log4r::warn(.le$logger, paste("Metadata file not found:", metadata_path))
+    log4r::debug(.le$logger, paste("load_image_metadata: not found", metadata_path))
     return(NULL)
   }
 
   tryCatch({
     metadata <- jsonlite::read_json(metadata_path)
-    log4r::debug(.le$logger, paste("Loaded metadata from:", metadata_path))
+    log4r::debug(.le$logger, paste("load_image_metadata: loaded", metadata_path))
     return(metadata)
   }, error = function(e) {
-    log4r::warn(.le$logger, paste("Error reading metadata file:", metadata_path, "-", e$message))
+    log4r::warn(.le$logger, paste("load_image_metadata: failed to parse", metadata_path, "-", e$message))
     return(NULL)
   })
 }

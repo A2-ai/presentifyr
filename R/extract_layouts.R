@@ -10,13 +10,11 @@
 #' }
 extract_layouts <- function(base_pptx,
                             output_dir) {
-  log4r::debug(.le$logger, "Starting extract layouts R function")
+  log4r::debug(.le$logger, paste0("extract_layouts: input=", base_pptx, ", output_dir=", output_dir))
 
   script <- system.file("scripts/extract_layouts.py", package = "presentifyr")
 
   validate_pptx_file(base_pptx)
-
-  log4r::debug(.le$logger, paste("Using provided base_pptx: ", base_pptx))
 
   result <- run_python_script(
     script_args = c(script, "-b", base_pptx, "-o", output_dir),
@@ -45,9 +43,9 @@ extract_layouts <- function(base_pptx,
         original_names[i] <- metadata[[layout_key]]$layout_name %||% layout_names[i]
       }
     }
-    log4r::debug(.le$logger, "Loaded layout metadata from JSON")
+    log4r::debug(.le$logger, paste("extract_layouts: loaded metadata from", metadata_path))
   } else {
-    log4r::warn(.le$logger, "Layout metadata JSON not found")
+    log4r::warn(.le$logger, paste("extract_layouts: metadata JSON not found at", metadata_path))
   }
 
   sorted_order <- order(layout_names)
@@ -64,7 +62,7 @@ extract_layouts <- function(base_pptx,
     stringsAsFactors = FALSE
   )
 
-  log4r::debug(.le$logger, "Exiting extract layouts R function")
+  log4r::debug(.le$logger, paste0("extract_layouts: complete, ", nrow(out_df), " layouts found"))
 
   return(out_df)
 }

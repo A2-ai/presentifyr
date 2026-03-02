@@ -48,13 +48,13 @@ include_imgs <- function() {
 list_files_and_dirs <- function(path,
                                 pattern,
                                 all.files = FALSE) {
-  log4r::debug(.le$logger, paste0("Listing files and directories for path: ", path))
+  log4r::debug(.le$logger, paste0("list_files_and_dirs: path=", path))
 
   included_files <- fs::dir_ls(path = path, all = all.files, regexp = NULL, recurse = FALSE, ignore.case = TRUE)
 
   included_files <- included_files[grepl(pattern, included_files) | fs::is_dir(included_files)]
 
-  log4r::debug(.le$logger, paste0("Included files: ", paste(included_files, collapse = ", ")))
+  log4r::debug(.le$logger, paste0("list_files_and_dirs: ", length(included_files), " entries after filter"))
 
   non_empty_dirs <- sapply(included_files, function(x) {
     if (fs::dir_exists(x)) {
@@ -73,7 +73,7 @@ list_files_and_dirs <- function(path,
   # didn't reuse included_files because wanted only files rather than both files and dirs + recurse
   if (length(included_files) == 0) {
     list_all <- fs::dir_ls(path = path, all = TRUE, regexp = NULL, recurse = TRUE, ignore.case = TRUE, type = "file")
-    log4r::debug(.le$logger, paste0("All files (when included_files is empty): ", paste(list_all, collapse = ", ")))
+    log4r::debug(.le$logger, paste0("list_files_and_dirs: 0 matches, found ", length(list_all), " files recursively"))
     return(list(files = list_all, empty = TRUE))
   }
 
@@ -111,11 +111,11 @@ treeNavigatorServer <- function(id,
   theme <- match.arg(theme, c("default", "proton"))
 
   shiny::moduleServer(id, function(input, output, session) {
-    log4r::debug(.le$logger, paste0("Initializing treeNavigatorServer module with id: ", id))
+    log4r::debug(.le$logger, paste0("treeNavigatorServer: initializing, id=", id, ", root=", rootFolder))
 
     output[["treeNavigator"]] <- jsTreeR::renderJstree({
       shiny::req(...)
-      log4r::debug(.le$logger, paste0("Rendering jstree for rootFolder: ", rootFolder))
+      log4r::debug(.le$logger, paste0("treeNavigatorServer: rendering jstree for ", rootFolder))
 
       suppressMessages(jsTreeR::jstree(
         nodes = list(
@@ -153,18 +153,18 @@ treeNavigatorServer <- function(id,
     # example: given input "testTree/inst/www", full_path will be "/path/to/proj/testTree/inst/www"
     shiny::observeEvent(input[["path_from_js"]], {
       input <- input[["path_from_js"]]
-      log4r::debug(.le$logger, paste0("Received path_from_js input: ", paste(input, collapse = ", ")))
+      log4r::debug(.le$logger, paste0("treeNavigatorServer: path_from_js = ", paste(input, collapse = ", ")))
 
       # null is sent back to reset the input if user wants to reselect unviable dirs
       if (is.null(input)) {
-        log4r::debug(.le$logger, "Input is NULL, resetting selection")
+        log4r::debug(.le$logger, "treeNavigatorServer: path_from_js is NULL, resetting")
         return()
       }
       full_path <- fs::path(dirname, input)
-      log4r::debug(.le$logger, paste0("Full path constructed: ", full_path))
+      log4r::debug(.le$logger, paste0("treeNavigatorServer: resolved path = ", full_path))
 
       lf <- list_files_and_dirs(full_path, pattern = pattern, all.files = all.files)
-      log4r::debug(.le$logger, paste0("List files and dirs result: ", paste(lf$files, collapse = ", ")))
+      log4r::debug(.le$logger, paste0("treeNavigatorServer: list_files_and_dirs returned ", length(lf$files), " entries, empty=", lf$empty))
 
       # if no viable children found, send msg to revert state and open modal
       # otherwise tree state will have miscalculated state and think node exists when it does not
@@ -175,7 +175,7 @@ treeNavigatorServer <- function(id,
           easyClose = TRUE,
           htmltools::HTML(message_content)
         ))
-        log4r::debug(.le$logger, "Modal shown due to no viable children found")
+        log4r::debug(.le$logger, paste("treeNavigatorServer: no viable children in", full_path))
         return()
       }
 
@@ -192,7 +192,7 @@ treeNavigatorServer <- function(id,
     Paths <- shiny::reactiveVal()
     shiny::observeEvent(input[["treeNavigator_selected_paths"]], {
       selected <- input[["treeNavigator_selected_paths"]]
-      log4r::debug(.le$logger, paste0("Selected file paths: ", paste(selected, collapse = ", ")))
+      log4r::debug(.le$logger, paste0("treeNavigatorServer: ", length(selected), " files selected"))
 
       adjusted_paths <- sapply(selected, function(item) {
         fs::path_rel(item[["path"]], start = basename(rootFolder))
