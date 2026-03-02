@@ -53,7 +53,7 @@ jobs:
       - name: rv-sysdeps-install
         run: |
           dnf install -y epel-release
-          MISSING_DEPS="$(rv sysdeps --only-absent --ignore pandoc) libgit2-devel libcurl-devel"
+          MISSING_DEPS="$(rv sysdeps --only-absent --ignore pandoc) libgit2-devel libcurl-devel cairo-devel"
           if [ -n "$MISSING_DEPS" ]; then
             echo "Found missing system dependencies:"
             echo "$MISSING_DEPS"
