@@ -54,6 +54,8 @@ add_images <- function(files, output_pptx,
     all_files
   )
 
+  log4r::debug(.le$logger, paste0("add_images: image keys = [", paste(image_keys, collapse = ", "), "]"))
+
   ## Build config for Python script
   config <- list(
     slide_layout_name = slide_layout_name,
@@ -74,7 +76,7 @@ add_images <- function(files, output_pptx,
     script_args <- c(script_args, "-b", base_pptx)
   }
 
-  result <- run_python_script(script_args, label = "Add images")
+  run_python_script(script_args, label = "Add images")
 
-  log4r::info(.le$logger, paste("add_images: PowerPoint saved as", output_pptx))
+  log4r::info(.le$logger, paste("add_images: complete, output =", output_pptx))
 }

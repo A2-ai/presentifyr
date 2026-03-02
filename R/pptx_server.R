@@ -108,6 +108,17 @@ pptx_server <- function(id) {
 
       shiny::observeEvent(input$close_configs, {
         persist_footnote_font_inputs()
+        fs <- rv$footnote_font
+        style_flags <- c(
+          if (isTRUE(fs$bold)) "Bold",
+          if (isTRUE(fs$italic)) "Italic",
+          if (isTRUE(fs$underline)) "Underline"
+        )
+        style_text <- if (length(style_flags) > 0) paste(style_flags, collapse = "+") else "Regular"
+        log4r::info(.le$logger, paste0(
+          "pptx_server: config saved, footnote font = ",
+          fs$font_name, " ", fs$font_size, "pt ", style_text, " ", fs$font_color
+        ))
         shiny::removeModal()
       })
 
@@ -149,6 +160,9 @@ pptx_server <- function(id) {
 
       shiny::observeEvent(input$pptx_filename, {
         rv$report_filename <- trimws(input$pptx_filename)
+        if (nzchar(rv$report_filename)) {
+          log4r::info(.le$logger, paste("pptx_server: output filename set to", rv$report_filename))
+        }
       })
 
       ## Render filename label separately so it doesn't affect template upload
@@ -596,9 +610,8 @@ pptx_server <- function(id) {
       # 7a. Preview modal for slide arrangement
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       shiny::observeEvent(input$preview_slides, {
-        log4r::debug(.le$logger, "pptx_server: opening slide preview modal")
-
         selected <- selected_items()
+        log4r::info(.le$logger, paste0("pptx_server: preview requested, ", length(selected), " files selected"))
         ## selected_items() returns list of lists with 'path' element - extract and make absolute
         files <- vapply(selected, function(item) {
           f <- if (is.list(item)) item$path else item
@@ -892,6 +905,7 @@ pptx_server <- function(id) {
               shiny::observeEvent(input[[paste0("move_up_", idx)]], {
                 if (idx > 1) {
                   files <- unlist(rv$slide_groups)
+                  log4r::info(.le$logger, paste0("pptx_server: move up image ", idx, " (", basename(files[idx]), ")"))
                   files[c(idx - 1, idx)] <- files[c(idx, idx - 1)]
                   result <- regroup_files(files, rv$slide_groups)
                   rv$slide_groups <- result$groups
@@ -902,6 +916,7 @@ pptx_server <- function(id) {
               shiny::observeEvent(input[[paste0("move_down_", idx)]], {
                 files <- unlist(rv$slide_groups)
                 if (idx < length(files)) {
+                  log4r::info(.le$logger, paste0("pptx_server: move down image ", idx, " (", basename(files[idx]), ")"))
                   files[c(idx, idx + 1)] <- files[c(idx + 1, idx)]
                   result <- regroup_files(files, rv$slide_groups)
                   rv$slide_groups <- result$groups
@@ -911,6 +926,7 @@ pptx_server <- function(id) {
 
               ## Split before: this image and everything after moves to new slide
               shiny::observeEvent(input[[paste0("split_before_", idx)]], {
+                log4r::info(.le$logger, paste0("pptx_server: split before image ", idx, ", slides ", length(rv$slide_groups), " -> ", length(rv$slide_groups) + 1))
                 result <- split_before_index(rv$slide_groups, rv$slide_positions, idx)
                 rv$slide_groups <- result$groups
                 rv$slide_positions <- result$positions
@@ -932,6 +948,7 @@ pptx_server <- function(id) {
 
               shiny::observeEvent(input[[paste0("merge_slide_", slide_idx)]], {
                 if (slide_idx < length(rv$slide_groups)) {
+                  log4r::info(.le$logger, paste0("pptx_server: merge slide ", slide_idx, " with ", slide_idx + 1, ", slides ", length(rv$slide_groups), " -> ", length(rv$slide_groups) - 1))
                   result <- merge_slides(rv$slide_groups, rv$slide_positions, slide_idx)
                   rv$slide_groups <- result$groups
                   rv$slide_positions <- result$positions
@@ -958,6 +975,7 @@ pptx_server <- function(id) {
                   pos <- p
 
                   shiny::observeEvent(input[[paste0("pos_", slide_idx, "_", file_idx, "_", pos)]], {
+                    log4r::info(.le$logger, paste0("pptx_server: slot change, slide ", slide_idx, " image ", file_idx, " -> slot ", pos))
                     rv$slide_positions[[slide_idx]][file_idx] <- pos
                   }, ignoreInit = TRUE)
                 })
