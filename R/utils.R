@@ -205,6 +205,44 @@ parse_directory_for_images <- function(directory,
 #' @return A list containing the metadata, or NULL if not found
 #' @keywords internal
 #' @noRd
+load_abbreviation_definitions <- function(yaml_path = NULL) {
+  if (is.null(yaml_path)) {
+    yaml_path <- system.file(
+      "extdata/standard_footnotes.yaml",
+      package = "reportifyr"
+    )
+  }
+
+  if (!nzchar(yaml_path) || !file.exists(yaml_path)) {
+    log4r::warn(.le$logger, paste(
+      "load_abbreviation_definitions: YAML not found at", yaml_path
+    ))
+    return(list())
+  }
+
+  tryCatch({
+    yaml_content <- yaml::read_yaml(yaml_path)
+    abbrevs <- yaml_content$abbreviations
+    if (is.null(abbrevs)) {
+      log4r::warn(
+        .le$logger,
+        "load_abbreviation_definitions: no abbreviations in YAML"
+      )
+      return(list()) # nolint
+    }
+    log4r::debug(.le$logger, paste(
+      "load_abbreviation_definitions: loaded", length(abbrevs), "abbreviations"
+    ))
+    abbrevs
+  }, error = function(e) {
+    log4r::warn(.le$logger, paste(
+      "load_abbreviation_definitions: YAML parse error -",
+      e$message
+    ))
+    list()
+  })
+}
+
 load_image_metadata <- function(image_path) {
   # Construct metadata filename: {name}_{ext}_metadata.json
   file_name <- basename(image_path)
@@ -234,47 +272,75 @@ load_image_metadata <- function(image_path) {
 
 #' Format slide notes with metadata
 #'
-#' @param metadata A list containing the metadata (from load_image_metadata)
+#' @param metadata A list containing the metadata
+#' @param abbreviation_definitions Named list mapping abbreviation
+#'   keys to their full forms. If NULL, raw keys are displayed.
 #'
 #' @return A formatted string for slide notes
 #' @keywords internal
 #' @noRd
-format_slide_notes <- function(metadata) {
+format_slide_notes <- function(metadata,
+                               abbreviation_definitions = NULL) {
   lines <- character()
 
-  # Source: source_meta.path + source_meta.latest_time
   source_path <- metadata$source_meta$path %||% ""
   source_time <- metadata$source_meta$latest_time %||% ""
   if (nzchar(source_path) && nzchar(source_time)) {
-    lines <- c(lines, paste0("Source: ", source_path, " ", source_time))
+    lines <- c(lines, paste0(
+      "Source: ", source_path, " ", source_time
+    ))
   } else if (nzchar(source_path)) {
     lines <- c(lines, paste0("Source: ", source_path))
   } else {
     lines <- c(lines, "Source: N/A")
   }
 
-  # Notes: object_meta.footnotes.notes (joined with ". ")
   notes_list <- metadata$object_meta$footnotes$notes
   if (length(notes_list) > 0 && !all(notes_list == "")) {
-    notes_text <- paste(sapply(notes_list, function(n) {
+    notes_text <- paste(vapply(notes_list, function(n) {
       if (!endsWith(n, ".")) paste0(n, ".") else n
-    }), collapse = " ")
+    }, character(1)), collapse = " ")
     lines <- c(lines, paste0("Notes: ", notes_text))
   } else {
     lines <- c(lines, "Notes: N/A")
   }
 
-  # Abbreviations: object_meta.footnotes.abbreviations (comma-separated)
   abbrev_list <- metadata$object_meta$footnotes$abbreviations
   if (length(abbrev_list) > 0 && !all(abbrev_list == "")) {
-    lines <- c(lines, paste0("Abbreviations: ", paste(abbrev_list, collapse = ", ")))
+    abbrev_text <- decode_abbreviations(
+      abbrev_list, abbreviation_definitions
+    )
+    lines <- c(lines, paste0("Abbreviations: ", abbrev_text))
   } else {
     lines <- c(lines, "Abbreviations: N/A")
   }
 
-  # Trailing blank line separator
   lines <- c(lines, "")
-
-  return(paste(lines, collapse = "\n"))
+  paste(lines, collapse = "\n")
 }
 
+#' Decode abbreviation keys into "KEY: full form" strings
+#'
+#' @param abbrev_list Character vector of abbreviation keys
+#' @param definitions Named list mapping keys to full forms
+#'
+#' @return A single formatted string
+#' @keywords internal
+#' @noRd
+decode_abbreviations <- function(abbrev_list, definitions = NULL) {
+  if (is.null(definitions) || length(definitions) == 0) {
+    return(paste(abbrev_list, collapse = ", "))
+  }
+  parts <- vapply(abbrev_list, function(key) {
+    full_form <- definitions[[key]]
+    if (is.null(full_form)) {
+      log4r::warn(.le$logger, paste(
+        "Abbreviation not found in YAML:", key
+      ))
+      key
+    } else {
+      paste0(key, ": ", sub("\\.$", "", full_form))
+    }
+  }, character(1), USE.NAMES = FALSE)
+  paste0(paste(parts, collapse = ", "), ".")
+}

@@ -57,12 +57,15 @@ add_images <- function(files, output_pptx,
   log4r::debug(.le$logger, paste0("add_images: image keys = [", paste(image_keys, collapse = ", "), "]"))
 
   ## Build config for Python script
+  abbrev_defs <- load_abbreviation_definitions()
+
   config <- list(
     slide_layout_name = slide_layout_name,
     slide_groups = slide_groups,
     slide_positions = slide_positions,
     font_settings = font_settings,
-    image_keys = as.list(image_keys)
+    image_keys = as.list(image_keys),
+    abbreviation_definitions = abbrev_defs
   )
 
   temp_config <- tempfile(fileext = ".json")

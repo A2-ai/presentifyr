@@ -39,15 +39,18 @@ test_that("sync_images writes JSON with basename keys when images are outside pr
   mockery::stub(sync_images, "parse_directory_for_images", function(...) mock_images)
   mockery::stub(sync_images, "run_python_script", mock_python_success)
 
-  temp_json_file <- NULL
+  temp_files <- list()
+  call_count <- 0L
   mockery::stub(sync_images, "tempfile", function(fileext = ".json") {
-    temp_json_file <<- tempfile(fileext = fileext)
-    return(temp_json_file)
+    call_count <<- call_count + 1L
+    tf <- tempfile(fileext = fileext)
+    temp_files[[call_count]] <<- tf
+    tf
   })
 
   sync_images(input_pptx, output_pptx)
 
-  written_json <- jsonlite::read_json(temp_json_file)
+  written_json <- jsonlite::read_json(temp_files[[1]])
 
   ## Keys should be basenames since mock paths are outside any project root
   expect_equal(names(written_json), c("image1.png", "image2.png"))
@@ -71,12 +74,18 @@ test_that("sync_images writes JSON with relative keys when images are under proj
   mockery::stub(sync_images, "get_project_dir", function() root)
   mockery::stub(sync_images, "parse_directory_for_images", function(...) c(img_rel, img_outside))
   mockery::stub(sync_images, "run_python_script", mock_python_success)
-  temp_json_file <- tempfile(fileext = ".json")
-  mockery::stub(sync_images, "tempfile", function(fileext = ".json") temp_json_file)
+  temp_files <- list()
+  call_count <- 0L
+  mockery::stub(sync_images, "tempfile", function(fileext = ".json") {
+    call_count <<- call_count + 1L
+    tf <- tempfile(fileext = fileext)
+    temp_files[[call_count]] <<- tf
+    tf
+  })
 
   sync_images(input_pptx, output_pptx)
 
-  written_json <- jsonlite::read_json(temp_json_file)
+  written_json <- jsonlite::read_json(temp_files[[1]])
   ## In-root image gets a relative key
   expect_true("figs/plot.png" %in% names(written_json))
   ## Outside-root image falls back to basename key

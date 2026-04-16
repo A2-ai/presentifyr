@@ -265,7 +265,7 @@ def update_text_preserve_formatting(text_frame, new_text):
                 t_elem.text = new_line
 
 
-def sync_images(input_pptx, output_pptx, image_dict):
+def sync_images(input_pptx, output_pptx, image_dict, abbreviation_definitions=None):
     logger = get_logger()
     logger.debug(f"Starting sync images Python function")
 
@@ -360,7 +360,7 @@ def sync_images(input_pptx, output_pptx, image_dict):
             if slide_metadata_list:
                 # Combine notes from all images (matching add_images.R behavior)
                 combined_notes = "\n\n".join(
-                    f"## {name}\n{format_slide_notes(meta)}"
+                    f"## {name}\n{format_slide_notes(meta, abbreviation_definitions)}"
                     for name, meta in slide_metadata_list.items()
                 )
 
@@ -416,14 +416,21 @@ if __name__ == "__main__":
     parser.add_argument('-i', '--input_pptx', type=str, required=True, help="Input pptx file path")
     parser.add_argument('-o', '--output_pptx', type=str, required=True, help="Output pptx file path")
     parser.add_argument('-d', '--image_dict', type=str, required=True, help="Path to JSON file containing image dictionary")
+    parser.add_argument('-a', '--abbreviations', type=str, default=None, help="Path to JSON file containing abbreviation definitions")
 
     args = parser.parse_args()
 
     with open(args.image_dict, 'r') as f:
         image_dict = json.load(f)
 
+    abbrev_defs = None
+    if args.abbreviations:
+        with open(args.abbreviations, 'r') as f:
+            abbrev_defs = json.load(f)
+
     sync_images(
         input_pptx=args.input_pptx,
         output_pptx=args.output_pptx,
-        image_dict=image_dict
+        image_dict=image_dict,
+        abbreviation_definitions=abbrev_defs
     )

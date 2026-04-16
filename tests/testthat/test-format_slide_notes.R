@@ -1,6 +1,8 @@
-test_that("format_slide_notes with full metadata produces all three lines", {
+test_that("format_slide_notes decodes abbreviations when definitions provided", {
   metadata <- list(
-    source_meta = list(path = "scripts/run.R", latest_time = "2026-01-15 10:30"),
+    source_meta = list(
+      path = "scripts/run.R", latest_time = "2026-01-15 10:30"
+    ),
     object_meta = list(
       footnotes = list(
         notes = list("Population was adults", "Dose was 100mg."),
@@ -9,15 +11,48 @@ test_that("format_slide_notes with full metadata produces all three lines", {
     )
   )
 
+  abbrev_defs <- list(
+    CI = "confidence interval",
+    HR = "hazard ratio",
+    AUC = "area under the curve"
+  )
+
+  result <- format_slide_notes(metadata, abbrev_defs)
+  lines <- strsplit(result, "\n")[[1]]
+
+  expect_equal(
+    lines[1], "Source: scripts/run.R 2026-01-15 10:30"
+  )
+  expect_equal(
+    lines[2], "Notes: Population was adults. Dose was 100mg."
+  )
+  expect_equal(
+    lines[3],
+    paste0(
+      "Abbreviations: CI: confidence interval, ",
+      "HR: hazard ratio, AUC: area under the curve."
+    )
+  )
+  expect_true(grepl("\n$", result))
+})
+
+test_that("format_slide_notes shows raw keys when no definitions provided", {
+  metadata <- list(
+    source_meta = list(
+      path = "scripts/run.R", latest_time = "2026-01-15 10:30"
+    ),
+    object_meta = list(
+      footnotes = list(
+        notes = list("Population was adults"),
+        abbreviations = list("CI", "HR")
+      )
+    )
+  )
+
   result <- format_slide_notes(metadata)
   lines <- strsplit(result, "\n")[[1]]
 
-  expect_equal(lines[1], "Source: scripts/run.R 2026-01-15 10:30")
-  ## "Population was adults" gets a period appended; "Dose was 100mg." already has one
-  expect_equal(lines[2], "Notes: Population was adults. Dose was 100mg.")
-  expect_equal(lines[3], "Abbreviations: CI, HR, AUC")
-  ## Trailing blank line — result ends with "\n"
-  expect_true(grepl("\n$", result))
+  expect_equal(lines[3], "Abbreviations: CI, HR")
 })
 
 test_that("format_slide_notes shows source path without time when time is missing", {
@@ -54,10 +89,12 @@ test_that("format_slide_notes shows N/A for notes when notes list is all empty s
     )
   )
 
-  result <- format_slide_notes(metadata)
+  abbrev_defs <- list(BMI = "body mass index")
+
+  result <- format_slide_notes(metadata, abbrev_defs)
 
   expect_true(grepl("Notes: N/A", result))
-  expect_true(grepl("Abbreviations: BMI", result))
+  expect_true(grepl("Abbreviations: BMI: body mass index\\.", result))
 })
 
 test_that("format_slide_notes appends period to notes missing trailing period", {
@@ -74,4 +111,30 @@ test_that("format_slide_notes appends period to notes missing trailing period", 
   result <- format_slide_notes(metadata)
 
   expect_true(grepl("No period here\\. Has period\\.", result))
+})
+
+test_that("format_slide_notes falls back to raw key for unknown abbreviation", {
+  metadata <- list(
+    source_meta = list(path = "x.R"),
+    object_meta = list(
+      footnotes = list(
+        notes = list(),
+        abbreviations = list("CI", "UNKNOWN")
+      )
+    )
+  )
+
+  abbrev_defs <- list(CI = "confidence interval")
+
+  result <- format_slide_notes(metadata, abbrev_defs)
+
+  expect_true(grepl("CI: confidence interval, UNKNOWN\\.", result))
+})
+
+test_that("decode_abbreviations strips trailing period from definitions", {
+  defs <- list(AUC = "area under the curve.")
+
+  result <- decode_abbreviations(list("AUC"), defs)
+
+  expect_equal(result, "AUC: area under the curve.")
 })
