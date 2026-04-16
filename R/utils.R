@@ -207,10 +207,17 @@ parse_directory_for_images <- function(directory,
 #' @noRd
 load_abbreviation_definitions <- function(yaml_path = NULL) {
   if (is.null(yaml_path)) {
-    yaml_path <- system.file(
-      "extdata/standard_footnotes.yaml",
-      package = "reportifyr"
+    project_yaml <- file.path(
+      get_project_dir(), "report", "standard_footnotes.yaml"
     )
+    if (file.exists(project_yaml)) {
+      yaml_path <- project_yaml
+    } else {
+      yaml_path <- system.file(
+        "extdata/standard_footnotes.yaml",
+        package = "reportifyr"
+      )
+    }
   }
 
   if (!nzchar(yaml_path) || !file.exists(yaml_path)) {
