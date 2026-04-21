@@ -1,3 +1,12 @@
+# presentifyr 0.2.1
+
+## Improvements
+
+* Slide notes now decode abbreviation keys into `KEY: full form` strings
+  using the project's `report/standard_footnotes.yaml` (falling back to
+  the copy shipped with `reportifyr`). Unknown keys fall back to the raw
+  key and emit a warning.
+
 # presentifyr 0.2.0
 
 First public release.
