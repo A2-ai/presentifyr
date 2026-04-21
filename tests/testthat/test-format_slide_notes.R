@@ -36,7 +36,7 @@ test_that("format_slide_notes decodes abbreviations when definitions provided", 
   expect_true(grepl("\n$", result))
 })
 
-test_that("format_slide_notes shows raw keys when no definitions provided", {
+test_that("format_slide_notes errors when abbreviations present but no definitions", {
   metadata <- list(
     source_meta = list(
       path = "scripts/run.R", latest_time = "2026-01-15 10:30"
@@ -49,10 +49,10 @@ test_that("format_slide_notes shows raw keys when no definitions provided", {
     )
   )
 
-  result <- format_slide_notes(metadata)
-  lines <- strsplit(result, "\n")[[1]]
-
-  expect_equal(lines[3], "Abbreviations: CI, HR")
+  expect_error(
+    format_slide_notes(metadata),
+    "Abbreviation 'CI' not found"
+  )
 })
 
 test_that("format_slide_notes shows source path without time when time is missing", {
@@ -113,7 +113,7 @@ test_that("format_slide_notes appends period to notes missing trailing period", 
   expect_true(grepl("No period here\\. Has period\\.", result))
 })
 
-test_that("format_slide_notes falls back to raw key for unknown abbreviation", {
+test_that("format_slide_notes errors when abbreviation key is missing from definitions", {
   metadata <- list(
     source_meta = list(path = "x.R"),
     object_meta = list(
@@ -126,9 +126,10 @@ test_that("format_slide_notes falls back to raw key for unknown abbreviation", {
 
   abbrev_defs <- list(CI = "confidence interval")
 
-  result <- format_slide_notes(metadata, abbrev_defs)
-
-  expect_true(grepl("CI: confidence interval, UNKNOWN\\.", result))
+  expect_error(
+    format_slide_notes(metadata, abbrev_defs),
+    "Abbreviation 'UNKNOWN' not found"
+  )
 })
 
 test_that("decode_abbreviations strips trailing period from definitions", {

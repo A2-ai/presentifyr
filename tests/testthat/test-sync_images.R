@@ -37,7 +37,16 @@ test_that("sync_images writes JSON with basename keys when images are outside pr
 
   mock_images <- c("/path/to/image1.png", "/path/to/image2.png")
   mockery::stub(sync_images, "parse_directory_for_images", function(...) mock_images)
-  mockery::stub(sync_images, "run_python_script", mock_python_success)
+
+  captured_args <- NULL
+  mockery::stub(sync_images, "run_python_script", function(script_args, label) {
+    captured_args <<- script_args
+    list(stdout = "", stderr = "", status = 0)
+  })
+
+  mockery::stub(sync_images, "load_abbreviation_definitions", function() {
+    list(CI = "confidence interval", HR = "hazard ratio")
+  })
 
   temp_files <- list()
   call_count <- 0L
@@ -57,6 +66,15 @@ test_that("sync_images writes JSON with basename keys when images are outside pr
   ## Values should be the full paths
   expect_equal(written_json[["image1.png"]], "/path/to/image1.png")
   expect_equal(written_json[["image2.png"]], "/path/to/image2.png")
+
+  ## -a flag is passed with the abbreviation JSON path
+  expect_true("-a" %in% captured_args)
+  expect_true(temp_files[[2]] %in% captured_args)
+
+  ## Abbreviation JSON contains the stubbed definitions
+  abbrev_json <- jsonlite::read_json(temp_files[[2]])
+  expect_equal(abbrev_json$CI, "confidence interval")
+  expect_equal(abbrev_json$HR, "hazard ratio")
 })
 
 test_that("sync_images writes JSON with relative keys when images are under project root", {

@@ -65,30 +65,32 @@ def load_metadata_for_image(image_path):
 def decode_abbreviations(abbrev_list, definitions=None):
     """Decode abbreviation keys into 'KEY: full form' strings.
 
+    Matches reportifyr's footnote formatting convention.
+
     Args:
         abbrev_list: list of abbreviation key strings
-        definitions: dict mapping keys to full forms (optional)
+        definitions: dict mapping keys to full forms
 
     Returns:
         Formatted string like "CI: confidence interval, HR: hazard ratio."
+
+    Raises:
+        KeyError: if any abbreviation key is not in definitions.
     """
     filtered = [a for a in abbrev_list if a]
     if not filtered:
         return "N/A"
 
-    if not definitions:
-        return ', '.join(filtered)
-
-    logger = get_logger()
+    definitions = definitions or {}
     parts = []
     for key in filtered:
-        full_form = definitions.get(key)
-        if full_form is None:
-            logger.warning(f"Abbreviation not found in YAML: {key}")
-            parts.append(key)
-        else:
-            parts.append(f"{key}: {full_form.rstrip('.')}")
-
+        if key not in definitions:
+            raise KeyError(
+                f"Abbreviation '{key}' not found in abbreviations "
+                f"section of footnotes YAML"
+            )
+        full_form = definitions[key].rstrip('.')
+        parts.append(f"{key}: {full_form}")
     return ', '.join(parts) + '.'
 
 

@@ -198,31 +198,70 @@ parse_directory_for_images <- function(directory,
   return(image_files)
 }
 
-#' Load metadata JSON for an image file
+#' Get the configured report directory for this project
 #'
-#' @param image_path The path to the image file
+#' Reads the `.{report_dir}_init.json` file written by
+#' `reportifyr::initialize_report_project()` to find the configured
+#' report directory name. Falls back to `<project>/report` when no
+#' init file is present or readable.
 #'
-#' @return A list containing the metadata, or NULL if not found
+#' @return Absolute path to the report directory.
+#' @keywords internal
+#' @noRd
+get_report_dir <- function() {
+  project_dir <- get_project_dir()
+  init_files <- list.files(
+    project_dir,
+    pattern = "^\\..+_init\\.json$",
+    full.names = TRUE,
+    all.files = TRUE
+  )
+
+  if (length(init_files) == 0) {
+    return(file.path(project_dir, "report"))
+  }
+
+  if (length(init_files) > 1) {
+    log4r::warn(.le$logger, paste0(
+      "get_report_dir: multiple init files found, using ",
+      basename(init_files[1])
+    ))
+  }
+
+  tryCatch({
+    init <- jsonlite::read_json(init_files[1], simplifyVector = TRUE)
+    report_dir_name <- init$config$report_dir_name %||% "report"
+    file.path(project_dir, report_dir_name)
+  }, error = function(e) {
+    log4r::warn(.le$logger, paste0(
+      "get_report_dir: failed to parse ",
+      basename(init_files[1]), " - ", e$message
+    ))
+    file.path(project_dir, "report")
+  })
+}
+
+#' Load abbreviation definitions from a YAML file
+#'
+#' @param yaml_path The file path to the abbreviations YAML. Default is
+#'   NULL. If NULL, uses `<report_dir>/standard_footnotes.yaml` where
+#'   `report_dir` is discovered from the reportifyr init file.
+#'
+#' @return A named list mapping abbreviation keys to full forms, or an
+#'   empty list if the YAML is missing or malformed.
 #' @keywords internal
 #' @noRd
 load_abbreviation_definitions <- function(yaml_path = NULL) {
   if (is.null(yaml_path)) {
-    project_yaml <- file.path(
-      get_project_dir(), "report", "standard_footnotes.yaml"
-    )
-    if (file.exists(project_yaml)) {
-      yaml_path <- project_yaml
-    } else {
-      yaml_path <- system.file(
-        "extdata/standard_footnotes.yaml",
-        package = "reportifyr"
-      )
-    }
+    yaml_path <- file.path(get_report_dir(), "standard_footnotes.yaml")
   }
 
   if (!nzchar(yaml_path) || !file.exists(yaml_path)) {
-    log4r::warn(.le$logger, paste(
-      "load_abbreviation_definitions: YAML not found at", yaml_path
+    log4r::warn(.le$logger, paste0(
+      "load_abbreviation_definitions: no abbreviations YAML at ",
+      yaml_path,
+      " - raw abbreviation keys will be used. ",
+      "Create this file to enable decoding."
     ))
     return(list())
   }
@@ -250,6 +289,13 @@ load_abbreviation_definitions <- function(yaml_path = NULL) {
   })
 }
 
+#' Load metadata JSON for an image file
+#'
+#' @param image_path The path to the image file
+#'
+#' @return A list containing the metadata, or NULL if not found
+#' @keywords internal
+#' @noRd
 load_image_metadata <- function(image_path) {
   # Construct metadata filename: {name}_{ext}_metadata.json
   file_name <- basename(image_path)
@@ -335,19 +381,23 @@ format_slide_notes <- function(metadata,
 #' @keywords internal
 #' @noRd
 decode_abbreviations <- function(abbrev_list, definitions = NULL) {
-  if (is.null(definitions) || length(definitions) == 0) {
-    return(paste(abbrev_list, collapse = ", "))
+  filtered <- abbrev_list[nzchar(unlist(abbrev_list))]
+  if (length(filtered) == 0) {
+    return("N/A")
   }
-  parts <- vapply(abbrev_list, function(key) {
-    full_form <- definitions[[key]]
-    if (is.null(full_form)) {
-      log4r::warn(.le$logger, paste(
-        "Abbreviation not found in YAML:", key
-      ))
-      key
-    } else {
-      paste0(key, ": ", sub("\\.$", "", full_form))
+  definitions <- definitions %||% list()
+  parts <- vapply(filtered, function(key) {
+    if (!(key %in% names(definitions))) {
+      stop(sprintf(
+        paste0(
+          "Abbreviation '%s' not found in abbreviations section ",
+          "of footnotes YAML"
+        ),
+        key
+      ), call. = FALSE)
     }
+    full_form <- definitions[[key]]
+    paste0(key, ": ", sub("\\.$", "", full_form))
   }, character(1), USE.NAMES = FALSE)
   paste0(paste(parts, collapse = ", "), ".")
 }
