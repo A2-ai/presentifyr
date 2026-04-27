@@ -1,6 +1,6 @@
 Package: presentifyr
 Title: PowerPoint Precision, Shiny Simplicity
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: 
     c(
     person("Jacob", "Dumbleton", , "jacob@a2-ai.com", role = c("aut", "cre")),
@@ -31,6 +31,7 @@ Imports:
     processx (>= 3.8.4),
     reportifyr,
     rlang,
+    yaml,
     shiny (>= 1.8.1.1),
     stats
 Suggests:

@@ -94,6 +94,32 @@ test_that("add_images omits -b flag when base_pptx is NULL", {
   expect_false("-b" %in% captured_args)
 })
 
+test_that("add_images embeds abbreviation_definitions in the config JSON", {
+  output_pptx <- tempfile(fileext = ".pptx")
+
+  mockery::stub(add_images, "run_python_script", mock_python_success)
+  mockery::stub(add_images, "load_abbreviation_definitions", function() {
+    list(CI = "confidence interval", HR = "hazard ratio")
+  })
+
+  temp_config_file <- NULL
+  mockery::stub(add_images, "tempfile", function(fileext = ".json") {
+    temp_config_file <<- tempfile(fileext = fileext)
+    return(temp_config_file)
+  })
+
+  add_images(
+    files = c("/path/to/img1.png"),
+    output_pptx = output_pptx
+  )
+
+  config <- jsonlite::read_json(temp_config_file)
+
+  expect_true("abbreviation_definitions" %in% names(config))
+  expect_equal(config$abbreviation_definitions$CI, "confidence interval")
+  expect_equal(config$abbreviation_definitions$HR, "hazard ratio")
+})
+
 test_that("add_images uses single-image mode when slide_groups is NULL", {
   output_pptx <- tempfile(fileext = ".pptx")
 

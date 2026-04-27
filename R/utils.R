@@ -198,6 +198,97 @@ parse_directory_for_images <- function(directory,
   return(image_files)
 }
 
+#' Get the configured report directory for this project
+#'
+#' Reads the `.{report_dir}_init.json` file written by
+#' `reportifyr::initialize_report_project()` to find the configured
+#' report directory name. Falls back to `<project>/report` when no
+#' init file is present or readable.
+#'
+#' @return Absolute path to the report directory.
+#' @keywords internal
+#' @noRd
+get_report_dir <- function() {
+  project_dir <- get_project_dir()
+  init_files <- list.files(
+    project_dir,
+    pattern = "^\\..+_init\\.json$",
+    full.names = TRUE,
+    all.files = TRUE
+  )
+
+  if (length(init_files) == 0) {
+    return(file.path(project_dir, "report"))
+  }
+
+  if (length(init_files) > 1) {
+    log4r::warn(.le$logger, paste0(
+      "get_report_dir: multiple init files found, using ",
+      basename(init_files[1])
+    ))
+  }
+
+  tryCatch({
+    init <- jsonlite::read_json(init_files[1], simplifyVector = TRUE)
+    report_dir_name <- init$config$report_dir_name %||% "report"
+    file.path(project_dir, report_dir_name)
+  }, error = function(e) {
+    log4r::warn(.le$logger, paste0(
+      "get_report_dir: failed to parse ",
+      basename(init_files[1]), " - ", e$message
+    ))
+    file.path(project_dir, "report")
+  })
+}
+
+#' Load abbreviation definitions from a YAML file
+#'
+#' @param yaml_path The file path to the abbreviations YAML. Default is
+#'   NULL. If NULL, uses `<report_dir>/standard_footnotes.yaml` where
+#'   `report_dir` is discovered from the reportifyr init file.
+#'
+#' @return A named list mapping abbreviation keys to full forms, or an
+#'   empty list if the YAML is missing or malformed.
+#' @keywords internal
+#' @noRd
+load_abbreviation_definitions <- function(yaml_path = NULL) {
+  if (is.null(yaml_path)) {
+    yaml_path <- file.path(get_report_dir(), "standard_footnotes.yaml")
+  }
+
+  if (!nzchar(yaml_path) || !file.exists(yaml_path)) {
+    log4r::warn(.le$logger, paste0(
+      "load_abbreviation_definitions: no abbreviations YAML at ",
+      yaml_path,
+      " - raw abbreviation keys will be used. ",
+      "Create this file to enable decoding."
+    ))
+    return(list())
+  }
+
+  tryCatch({
+    yaml_content <- yaml::read_yaml(yaml_path)
+    abbrevs <- yaml_content$abbreviations
+    if (is.null(abbrevs)) {
+      log4r::warn(
+        .le$logger,
+        "load_abbreviation_definitions: no abbreviations in YAML"
+      )
+      return(list()) # nolint
+    }
+    log4r::debug(.le$logger, paste(
+      "load_abbreviation_definitions: loaded", length(abbrevs), "abbreviations"
+    ))
+    abbrevs
+  }, error = function(e) {
+    log4r::warn(.le$logger, paste(
+      "load_abbreviation_definitions: YAML parse error -",
+      e$message
+    ))
+    list()
+  })
+}
+
 #' Load metadata JSON for an image file
 #'
 #' @param image_path The path to the image file
@@ -234,47 +325,79 @@ load_image_metadata <- function(image_path) {
 
 #' Format slide notes with metadata
 #'
-#' @param metadata A list containing the metadata (from load_image_metadata)
+#' @param metadata A list containing the metadata
+#' @param abbreviation_definitions Named list mapping abbreviation
+#'   keys to their full forms. If NULL, raw keys are displayed.
 #'
 #' @return A formatted string for slide notes
 #' @keywords internal
 #' @noRd
-format_slide_notes <- function(metadata) {
+format_slide_notes <- function(metadata,
+                               abbreviation_definitions = NULL) {
   lines <- character()
 
-  # Source: source_meta.path + source_meta.latest_time
   source_path <- metadata$source_meta$path %||% ""
   source_time <- metadata$source_meta$latest_time %||% ""
   if (nzchar(source_path) && nzchar(source_time)) {
-    lines <- c(lines, paste0("Source: ", source_path, " ", source_time))
+    lines <- c(lines, paste0(
+      "Source: ", source_path, " ", source_time
+    ))
   } else if (nzchar(source_path)) {
     lines <- c(lines, paste0("Source: ", source_path))
   } else {
     lines <- c(lines, "Source: N/A")
   }
 
-  # Notes: object_meta.footnotes.notes (joined with ". ")
   notes_list <- metadata$object_meta$footnotes$notes
   if (length(notes_list) > 0 && !all(notes_list == "")) {
-    notes_text <- paste(sapply(notes_list, function(n) {
+    notes_text <- paste(vapply(notes_list, function(n) {
       if (!endsWith(n, ".")) paste0(n, ".") else n
-    }), collapse = " ")
+    }, character(1)), collapse = " ")
     lines <- c(lines, paste0("Notes: ", notes_text))
   } else {
     lines <- c(lines, "Notes: N/A")
   }
 
-  # Abbreviations: object_meta.footnotes.abbreviations (comma-separated)
   abbrev_list <- metadata$object_meta$footnotes$abbreviations
   if (length(abbrev_list) > 0 && !all(abbrev_list == "")) {
-    lines <- c(lines, paste0("Abbreviations: ", paste(abbrev_list, collapse = ", ")))
+    abbrev_text <- decode_abbreviations(
+      abbrev_list, abbreviation_definitions
+    )
+    lines <- c(lines, paste0("Abbreviations: ", abbrev_text))
   } else {
     lines <- c(lines, "Abbreviations: N/A")
   }
 
-  # Trailing blank line separator
   lines <- c(lines, "")
-
-  return(paste(lines, collapse = "\n"))
+  paste(lines, collapse = "\n")
 }
 
+#' Decode abbreviation keys into "KEY: full form" strings
+#'
+#' @param abbrev_list Character vector of abbreviation keys
+#' @param definitions Named list mapping keys to full forms
+#'
+#' @return A single formatted string
+#' @keywords internal
+#' @noRd
+decode_abbreviations <- function(abbrev_list, definitions = NULL) {
+  filtered <- abbrev_list[nzchar(unlist(abbrev_list))]
+  if (length(filtered) == 0) {
+    return("N/A")
+  }
+  definitions <- definitions %||% list()
+  parts <- vapply(filtered, function(key) {
+    if (!(key %in% names(definitions))) {
+      stop(sprintf(
+        paste0(
+          "Abbreviation '%s' not found in abbreviations section ",
+          "of footnotes YAML"
+        ),
+        key
+      ), call. = FALSE)
+    }
+    full_form <- definitions[[key]]
+    paste0(key, ": ", sub("\\.$", "", full_form))
+  }, character(1), USE.NAMES = FALSE)
+  paste0(paste(parts, collapse = ", "), ".")
+}

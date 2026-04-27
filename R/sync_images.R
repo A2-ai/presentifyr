@@ -39,13 +39,30 @@ sync_images <- function(input_pptx,
 
   image_dict <- as.list(stats::setNames(image_files, keys_primary))
   temp_image_dict <- tempfile(fileext = ".json")
-  jsonlite::write_json(image_dict, temp_image_dict, auto_unbox = TRUE, pretty = TRUE)
-  log4r::debug(.le$logger, paste("sync_images: image dictionary written to", temp_image_dict))
+  jsonlite::write_json(
+    image_dict, temp_image_dict,
+    auto_unbox = TRUE, pretty = TRUE
+  )
+  log4r::debug(.le$logger, paste(
+    "sync_images: image dictionary written to", temp_image_dict
+  ))
 
-  script <- system.file("scripts/sync_images.py", package = "presentifyr")
+  abbrev_defs <- load_abbreviation_definitions()
+  temp_abbrev <- tempfile(fileext = ".json")
+  jsonlite::write_json(
+    abbrev_defs, temp_abbrev,
+    auto_unbox = TRUE, pretty = TRUE
+  )
+
+  script <- system.file(
+    "scripts/sync_images.py", package = "presentifyr"
+  )
 
   result <- run_python_script(
-    script_args = c(script, "-i", input_pptx, "-o", output_pptx, "-d", temp_image_dict),
+    script_args = c(
+      script, "-i", input_pptx, "-o", output_pptx,
+      "-d", temp_image_dict, "-a", temp_abbrev
+    ),
     label = "Sync images"
   )
   log4r::debug(.le$logger, paste("sync_images: complete, output written to", output_pptx))

@@ -62,11 +62,45 @@ def load_metadata_for_image(image_path):
         return None
 
 
-def format_slide_notes(metadata):
+def decode_abbreviations(abbrev_list, definitions=None):
+    """Decode abbreviation keys into 'KEY: full form' strings.
+
+    Matches reportifyr's footnote formatting convention.
+
+    Args:
+        abbrev_list: list of abbreviation key strings
+        definitions: dict mapping keys to full forms
+
+    Returns:
+        Formatted string like "CI: confidence interval, HR: hazard ratio."
+
+    Raises:
+        KeyError: if any abbreviation key is not in definitions.
+    """
+    filtered = [a for a in abbrev_list if a]
+    if not filtered:
+        return "N/A"
+
+    definitions = definitions or {}
+    parts = []
+    for key in filtered:
+        if key not in definitions:
+            raise KeyError(
+                f"Abbreviation '{key}' not found in abbreviations "
+                f"section of footnotes YAML"
+            )
+        full_form = definitions[key].rstrip('.')
+        parts.append(f"{key}: {full_form}")
+    return ', '.join(parts) + '.'
+
+
+def format_slide_notes(metadata, abbreviation_definitions=None):
     """Format slide notes with metadata.
 
     Args:
         metadata: dict containing the metadata (from load_metadata_for_image)
+        abbreviation_definitions: dict mapping abbreviation keys to
+            their full forms. If None, raw keys are displayed.
 
     Returns:
         Formatted string for slide notes
@@ -99,11 +133,14 @@ def format_slide_notes(metadata):
     else:
         lines.append("Notes: N/A")
 
-    # Abbreviations: object_meta.footnotes.abbreviations (comma-separated)
+    # Abbreviations: decode keys using definitions
     abbrev_list = footnotes.get('abbreviations', [])
 
     if abbrev_list and any(a for a in abbrev_list if a):
-        lines.append(f"Abbreviations: {', '.join(a for a in abbrev_list if a)}")
+        abbrev_text = decode_abbreviations(
+            abbrev_list, abbreviation_definitions
+        )
+        lines.append(f"Abbreviations: {abbrev_text}")
     else:
         lines.append("Abbreviations: N/A")
 
