@@ -22,6 +22,7 @@ Imports:
     cli,
     jsonlite,
     fs (>= 1.6.4),
+    fyrstartr,
     gert (>= 2.1.0),
     here (>= 1.0.1),
     htmltools,
@@ -29,13 +30,13 @@ Imports:
     log4r,
     pkglite (>= 0.2.2),
     processx (>= 3.8.4),
-    reportifyr,
     rlang,
     yaml,
     shiny (>= 1.8.1.1),
     stats
 Suggests:
     mockery (>= 0.4.4),
+    reportifyr,
     testthat (>= 3.0.0),
     withr
 Config/testthat/edition: 3

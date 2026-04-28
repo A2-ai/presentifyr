@@ -3,6 +3,5 @@
 export(app)
 export(get_project_dir)
 export(initialize_app)
-export(install_pptx)
 export(toggle_logger)
 importFrom(rlang,"%||%")

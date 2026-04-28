@@ -1,8 +1,8 @@
-test_that("run_python_script returns processx result on success", {
-  mockery::stub(run_python_script, "reportifyr::get_venv_uv_paths", function() {
+test_that("run_python_script returns fyrstartr result on success", {
+  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
     list(venv = "/fake/venv", uv = "/fake/uv")
   })
-  mockery::stub(run_python_script, "processx::run", function(...) {
+  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(...) {
     list(stdout = "done", stderr = "", status = 0)
   })
 
@@ -14,12 +14,12 @@ test_that("run_python_script returns processx result on success", {
 })
 
 test_that("run_python_script prepends 'run' to script_args", {
-  mockery::stub(run_python_script, "reportifyr::get_venv_uv_paths", function() {
+  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
     list(venv = "/fake/venv", uv = "/fake/uv")
   })
 
   captured_args <- NULL
-  mockery::stub(run_python_script, "processx::run", function(command, args, ...) {
+  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(uv_path, args, ...) {
     captured_args <<- args
     list(stdout = "", stderr = "", status = 0)
   })
@@ -31,42 +31,71 @@ test_that("run_python_script prepends 'run' to script_args", {
   expect_equal(captured_args[3], "-f")
 })
 
-test_that("run_python_script sets VIRTUAL_ENV and PY_LOG_LEVEL in env", {
-  mockery::stub(run_python_script, "reportifyr::get_venv_uv_paths", function() {
-    list(venv = "/my/venv", uv = "/fake/uv")
+test_that("run_python_script forwards venv/uv paths and a stderr_callback to fyrstartr", {
+  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
+    list(venv = "/my/venv", uv = "/my/uv")
   })
 
-  captured_env <- NULL
-  mockery::stub(run_python_script, "processx::run", function(command, args, env, ...) {
-    captured_env <<- env
+  captured <- list()
+  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(uv_path, args, venv_path, script_name, pythonpath, stderr_callback, ...) {
+    captured <<- list(
+      uv_path = uv_path,
+      venv_path = venv_path,
+      script_name = script_name,
+      pythonpath = pythonpath,
+      stderr_callback = stderr_callback
+    )
     list(stdout = "", stderr = "", status = 0)
   })
 
-  withr::with_envvar(c("PRFY_VERBOSE" = "DEBUG"), {
+  run_python_script(c("script.py"), label = "Test")
+
+  expect_equal(captured$uv_path, "/my/uv")
+  expect_equal(captured$venv_path, "/my/venv")
+  expect_equal(captured$script_name, "Test")
+  expect_type(captured$pythonpath, "character")
+  expect_type(captured$stderr_callback, "closure")
+})
+
+test_that("run_python_script's stderr callback filters console by PRFY_VERBOSE", {
+  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
+    list(venv = "/my/venv", uv = "/my/uv")
+  })
+
+  cb_holder <- list(cb = NULL)
+  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(stderr_callback, ...) {
+    cb_holder$cb <<- stderr_callback
+    list(stdout = "", stderr = "", status = 0)
+  })
+
+  withr::with_envvar(c(PRFY_VERBOSE = "WARN"), {
     run_python_script(c("script.py"), label = "Test")
   })
 
-  expect_equal(captured_env[["VIRTUAL_ENV"]], "/my/venv")
-  expect_equal(captured_env[["PY_LOG_LEVEL"]], "DEBUG")
+  ## DEBUG and INFO suppressed at WARN threshold; WARNING/ERROR shown
+  out <- capture.output(cb_holder$cb("2026-01-01 [DEBUG] hidden\n", NULL))
+  expect_false(any(grepl("hidden", out)))
+
+  out <- capture.output(cb_holder$cb("2026-01-01 [WARNING] visible\n", NULL))
+  expect_true(any(grepl("visible", out)))
+
+  ## Lines without a [LEVEL] tag (raw tracebacks) always pass
+  out <- capture.output(cb_holder$cb("Traceback (most recent call last):\n", NULL))
+  expect_true(any(grepl("Traceback", out)))
 })
 
 test_that("run_python_script error includes label but not internal paths", {
-  mockery::stub(run_python_script, "reportifyr::get_venv_uv_paths", function() {
+  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
     list(venv = "/fake/venv", uv = "/fake/uv")
   })
-  mockery::stub(run_python_script, "processx::run", function(...) {
-    e <- simpleError("process failed")
-    e$status <- 1
-    e$stdout <- "some output"
-    e$stderr <- "/Users/secret/.venv/bin/python traceback here"
-    stop(e)
+  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(...) {
+    stop("Add images failed.", call. = FALSE)
   })
 
   expect_error(
     run_python_script(c("script.py"), label = "Add images"),
     "Add images failed"
   )
-  ## Stderr and internal paths must NOT leak into the user-facing error
   expect_error(
     run_python_script(c("script.py"), label = "Add images"),
     "PRFY_VERBOSE=DEBUG"
@@ -81,7 +110,7 @@ test_that("run_python_script error includes label but not internal paths", {
 })
 
 test_that("run_python_script propagates error when venv paths cannot be resolved", {
-  mockery::stub(run_python_script, "reportifyr::get_venv_uv_paths", function() {
+  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
     stop("Create virtual environment with initialize_python")
   })
 

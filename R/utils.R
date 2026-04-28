@@ -26,41 +26,69 @@ validate_pptx_file <- function(file_path) {
   }
 }
 
-#' Run a Python script via uv using the reportifyr venv
+#' Run a Python script via uv using the fyrstartr-managed venv
 #'
-#' Resolves venv/uv paths, executes the script with processx, and provides
-#' standardized error handling with logging.
+#' Thin wrapper over [fyrstartr::run_python_script()] that resolves the
+#' venv/uv paths, exposes presentifyr's `inst/scripts/` on `PYTHONPATH`,
+#' and surfaces a clean error message without leaking subprocess paths.
 #'
 #' @param script_args Character vector of arguments to pass after "uv run".
 #'   Typically c(script_path, "-flag", value, ...).
 #' @param label Short label for error messages (e.g. "Add images", "Sync images").
 #'
-#' @return The processx result list (stdout, stderr, status).
+#' @return The result from [fyrstartr::run_python_script()].
 #' @keywords internal
 #' @noRd
 run_python_script <- function(script_args, label) {
-  paths <- reportifyr::get_venv_uv_paths()
+  paths <- fyrstartr::get_venv_uv_paths()
   venv_path <- paths$venv
   uv_path <- paths$uv
   log4r::debug(.le$logger, paste("run_python_script: venv =", venv_path))
   log4r::debug(.le$logger, paste("run_python_script: uv =", uv_path))
 
-  args <- c("run", script_args)
+  ## Python emits every level to stderr; this callback parses the [LEVEL]
+  ## tag and filters console output by PRFY_VERBOSE. Lines without a tag
+  ## (e.g. raw tracebacks) always pass through.
+  py_levels <- c(
+    "DEBUG" = 1, "INFO" = 2, "WARNING" = 3, "ERROR" = 4, "CRITICAL" = 5
+  )
+  r_levels <- c(
+    "DEBUG" = 1, "INFO" = 2, "WARN" = 3, "ERROR" = 4, "FATAL" = 5
+  )
+  threshold <- r_levels[[Sys.getenv("PRFY_VERBOSE", unset = "WARN")]]
 
-  tryCatch({
-    processx::run(
-      command = uv_path,
-      args = args,
-      env = c("current", VIRTUAL_ENV = venv_path, PY_LOG_LEVEL = Sys.getenv("PRFY_VERBOSE", unset = "WARN")),
-      error_on_status = TRUE,
-      echo = TRUE
-    )
-  }, error = function(e) {
-    log4r::error(.le$logger, paste0(label, " Python script failed. Status: ", e$status))
-    log4r::error(.le$logger, paste0(label, " Python script failed. Stderr: ", e$stderr))
-    log4r::debug(.le$logger, paste0(label, " Python script failed. Stdout: ", e$stdout))
-    stop(paste0(label, " failed. Set PRFY_VERBOSE=DEBUG for details."))
-  })
+  py_callback <- function(chunk, proc) {
+    lines <- strsplit(chunk, "\n")[[1]]
+    for (line in lines) {
+      line <- trimws(line)
+      if (nchar(line) == 0) next
+
+      show <- TRUE
+      level_match <- regmatches(
+        line, regexpr("\\[(DEBUG|INFO|WARNING|ERROR|CRITICAL)\\]", line)
+      )
+      if (length(level_match) == 1) {
+        level <- gsub("\\[|\\]", "", level_match)
+        show <- py_levels[[level]] >= threshold
+      }
+      if (show) cat(line, "\n")
+    }
+  }
+
+  tryCatch(
+    fyrstartr::run_python_script(
+      uv_path = uv_path,
+      args = c("run", script_args),
+      venv_path = venv_path,
+      script_name = label,
+      pythonpath = system.file("scripts", package = "presentifyr"),
+      stderr_callback = py_callback
+    ),
+    error = function(e) {
+      log4r::error(.le$logger, paste0(label, " Python script failed: ", e$message))
+      stop(paste0(label, " failed. Set PRFY_VERBOSE=DEBUG for details."))
+    }
+  )
 }
 
 #' Show a standardized error modal in the Shiny UI

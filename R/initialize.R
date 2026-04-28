@@ -1,25 +1,23 @@
 #' Initialize presentifyr Application Environment
 #'
 #' @description
-#' Performs all necessary initialization steps for presentifyr,
-#' including reportifyr project setup (uv, .venv, and base Python
-#' dependencies) and python-pptx installation.
+#' Bootstraps the Python environment presentifyr's Shiny app needs:
+#' calls `fyrstartr::initialize_python(groups = "presentifyr")` to
+#' install uv (if missing) and additively sync the `presentifyr`
+#' dependency group (python-pptx, pillow) into `.venv/` from the
+#' fyrstartr-bundled lockfile. The sync runs in `--inexact` mode, so
+#' any packages already present in the venv from prior fyr-package
+#' installs are left in place.
 #'
 #' @param project_dir The file path to the main project directory.
 #'   Must already exist. Default is `get_project_dir()`.
-#' @param report_dir_name The directory name for reports. Default is `NULL`
-#'   (uses reportifyr default).
-#' @param outputs_dir_name The directory name for artifacts. Default is `NULL`
-#'   (uses reportifyr default).
-#' @param install_python_deps Logical. Whether to install Python dependencies.
-#'   Default is `TRUE`.
 #' @param verbose Logical. Print detailed initialization messages.
 #'   Default is `TRUE`.
 #'
 #' @return Invisibly returns a list with initialization status:
 #'   \itemize{
-#'     \item \code{reportifyr}: Logical indicating reportifyr initialization success
-#'     \item \code{python_pptx}: Logical indicating python-pptx installation success
+#'     \item \code{venv}: Logical indicating `.venv/` exists after the call
+#'     \item \code{python_pptx}: Logical indicating python-pptx is importable
 #'     \item \code{errors}: Character vector of any errors encountered
 #'   }
 #'
@@ -27,29 +25,19 @@
 #'
 #' @examples \dontrun{
 #' initialize_app()
-#'
-#' # Skip Python dependencies
-#' initialize_app(install_python_deps = FALSE)
 #' }
-initialize_app <- function(
-    project_dir = get_project_dir(),
-    report_dir_name = NULL,
-    outputs_dir_name = NULL,
-    install_python_deps = TRUE,
-    verbose = TRUE
-) {
-  # Initialize status tracking
+initialize_app <- function(project_dir = get_project_dir(),
+                           verbose = TRUE) {
   status <- list(
-    reportifyr = FALSE,
+    venv = FALSE,
     python_pptx = FALSE,
     errors = character(0)
   )
 
-  log4r::info(.le$logger, paste("initialize_app: starting, project_dir =", project_dir))
-
-  # Track whether components were already present
-  reportifyr_already <- FALSE
-  pptx_already <- FALSE
+  log4r::info(
+    .le$logger,
+    paste("initialize_app: starting, project_dir =", project_dir)
+  )
 
   if (verbose) {
     cat("\n")
@@ -57,123 +45,116 @@ initialize_app <- function(
     cat("\n")
   }
 
-  # Step 1: Check / initialize reportifyr
-  if (verbose) message("1/2 Checking reportifyr...")
+  # Resolve venv parent matching reportifyr's convention:
+  # getOption("venv_dir") if set, otherwise here::here().
+  venv_parent <- getOption("venv_dir") %||% here::here()
+  venv_path <- file.path(venv_parent, ".venv")
+  venv_already <- dir.exists(venv_path)
 
-  init_files <- list.files(
-    project_dir,
-    pattern = "^\\..+_init\\.json$",
-    full.names = TRUE,
-    all.files = TRUE
-  )
-  reportifyr_exists <- length(init_files) > 0
-  venv_exists <- dir.exists(file.path(project_dir, ".venv"))
+  # Ensure the venv exists 
+  if (verbose) message("1/2 Checking Python venv...")
 
-  if (reportifyr_exists && venv_exists) {
-    status$reportifyr <- TRUE
-    reportifyr_already <- TRUE
-    if (verbose) message(cli::col_green(cli::symbol$tick), "  reportifyr already initialized\n")
-  } else {
-    tryCatch({
-      suppressMessages({
-        reportifyr::initialize_report_project(
-          project_dir = project_dir,
-          report_dir_name = report_dir_name,
-          outputs_dir_name = outputs_dir_name
-        )
-      })
-      status$reportifyr <- TRUE
-      if (verbose) message(cli::col_green(cli::symbol$tick), "  reportifyr initialization complete\n")
-    }, error = function(e) {
-      status$errors <<- c(status$errors, paste("reportifyr:", e$message))
-      if (verbose) {
-        message(cli::col_red(cli::symbol$cross), "  reportifyr initialization failed: ", e$message, "\n")
-      }
-    })
-  }
-
-  # Step 2: Check / install python-pptx
-  if (install_python_deps) {
-    if (verbose) message("2/2 Checking python-pptx...")
-
-    pptx_installed <- FALSE
-    tryCatch({
-      paths <- reportifyr::get_venv_uv_paths()
-      python_exe <- file.path(paths$venv, "bin", "python")
-      check_result <- processx::run(
-        command = python_exe,
-        args = c("-c", "import pptx"),
-        error_on_status = FALSE,
-        stdout = "|",
-        stderr = "|"
+  if (venv_already) {
+    status$venv <- TRUE
+    if (verbose) {
+      message(
+        cli::col_green(cli::symbol$tick), "  .venv already present\n"
       )
-      pptx_installed <- (check_result$status == 0)
-    }, error = function(e) {
-      # venv doesn't exist yet or other issue
-    })
-
-    if (pptx_installed) {
-      status$python_pptx <- TRUE
-      pptx_already <- TRUE
-      if (verbose) message(cli::col_green(cli::symbol$tick), "  python-pptx already installed\n")
-    } else {
-      tryCatch({
-        py_status <- install_pptx(verbose = FALSE)
-        status$python_pptx <- py_status
-        if (verbose) {
-          if (py_status) {
-            message(cli::col_green(cli::symbol$tick), "  python-pptx installed\n")
-          } else {
-            message(cli::col_red(cli::symbol$cross), "  python-pptx failed to install\n")
-          }
-        }
-      }, error = function(e) {
-        status$errors <<- c(status$errors, paste("python-pptx:", e$message))
-        if (verbose) {
-          message(cli::col_red(cli::symbol$cross), "  python-pptx failed to install: ", e$message, "\n")
-        }
-      })
     }
   } else {
-    if (verbose) message("2/2 Skipping python-pptx installation\n")
-    status$python_pptx <- NA
+    tryCatch(
+      {
+        fyrstartr::initialize_python(
+          continue = "Y", groups = "presentifyr"
+        )
+        status$venv <- dir.exists(venv_path)
+        if (verbose && status$venv) {
+          message(
+            cli::col_green(cli::symbol$tick),
+            "  .venv created\n"
+          )
+        }
+      },
+      error = function(e) {
+        status$errors <<- c(status$errors, paste("venv:", e$message))
+        if (verbose) {
+          message(
+            cli::col_red(cli::symbol$cross),
+            "  venv bootstrap failed: ", e$message, "\n"
+          )
+        }
+      }
+    )
   }
 
-  # Summary - always show
+  # Verify python-pptx; recover if missing 
+  if (verbose) message("2/2 Verifying python-pptx...")
+
+  pptx_already <- pptx_importable(venv_path)
+
+  if (!pptx_already && status$venv) {
+    # .venv exists but pptx isn't importable -- the venv was set up by
+    # a prior fyrstartr call that didn't include the presentifyr group
+    log4r::info(
+      .le$logger,
+      "python-pptx not importable in existing .venv; re-syncing presentifyr group"
+    )
+    if (verbose) {
+      message(
+        "  .venv missing python-pptx; running fyrstartr to install presentifyr group..."
+      )
+    }
+    tryCatch(
+      fyrstartr::initialize_python(
+        continue = "Y", groups = "presentifyr"
+      ),
+      error = function(e) {
+        status$errors <<- c(
+          status$errors, paste("python-pptx sync:", e$message)
+        )
+      }
+    )
+  }
+
+  status$python_pptx <- pptx_importable(venv_path)
   if (verbose) {
-    cli::cli_rule("Initialization Summary")
-  } else {
-    cat("\n")
-    cli::cli_rule("Initialization Summary")
-  }
-
-  if (status$reportifyr) {
-    label <- if (reportifyr_already) "ALREADY INITIALIZED" else "SUCCESS"
-    message(cli::col_green(cli::symbol$tick), " reportifyr:         ", label)
-  } else {
-    message(cli::col_red(cli::symbol$cross), " reportifyr:         FAILED")
-  }
-
-  # Check if .venv exists
-  tryCatch({
-    paths <- reportifyr::get_venv_uv_paths()
-    if (dir.exists(paths$venv)) {
-      message(cli::col_green(cli::symbol$tick), " .venv:              EXISTS")
+    if (status$python_pptx) {
+      label <- if (pptx_already) "already importable" else "importable"
+      message(
+        cli::col_green(cli::symbol$tick), "  python-pptx ", label, "\n"
+      )
     } else {
-      message(cli::col_red(cli::symbol$cross), " .venv:              FAILED")
+      message(
+        cli::col_red(cli::symbol$cross), "  python-pptx not importable\n"
+      )
     }
-  }, error = function(e) {
-    message(cli::col_red(cli::symbol$cross), " .venv:              FAILED")
-  })
-
-  if (is.na(status$python_pptx)) {
-    message("python-pptx:        SKIPPED")
-  } else if (status$python_pptx) {
-    label <- if (pptx_already) "ALREADY INSTALLED" else "INSTALLED"
-    message(cli::col_green(cli::symbol$tick), " python-pptx:        ", label)
-  } else {
-    message(cli::col_red(cli::symbol$cross), " python-pptx:        FAILED")
   }
+
+  # Summary 
+  cli::cli_rule("Initialization Summary")
+
+  message(
+    if (status$venv) {
+      paste0(
+        cli::col_green(cli::symbol$tick), " .venv:              ",
+        if (venv_already) "ALREADY EXISTED" else "CREATED"
+      )
+    } else {
+      paste0(cli::col_red(cli::symbol$cross), " .venv:              FAILED")
+    }
+  )
+  message(
+    if (status$python_pptx) {
+      paste0(
+        cli::col_green(cli::symbol$tick), " python-pptx:        ",
+        if (pptx_already) "ALREADY INSTALLED" else "INSTALLED"
+      )
+    } else {
+      paste0(
+        cli::col_red(cli::symbol$cross), " python-pptx:        FAILED"
+      )
+    }
+  )
 
   if (length(status$errors) > 0) {
     cat("\n")
@@ -183,73 +164,43 @@ initialize_app <- function(
     }
   }
 
-  message(strrep("\u2500", getOption("width", 80)), "\n")
+  message(strrep("-", getOption("width", 80)), "\n")
 
   log4r::info(.le$logger, paste0(
-    "initialize_app: complete, reportifyr=", status$reportifyr,
+    "initialize_app: complete, venv=", status$venv,
     ", python_pptx=", status$python_pptx
   ))
 
-  # Return status invisibly
   invisible(status)
 }
 
-#' Install python-pptx into the reportifyr virtual environment
+#' Test whether `import pptx` succeeds in the given venv
 #'
-#' @param verbose Logical. Print installation messages. Default is `TRUE`.
+#' @param venv_path Path to `.venv/` directory.
 #'
-#' @return Invisibly returns `TRUE` on success, `FALSE` on failure.
+#' @return Logical. `TRUE` if the venv exists and python can `import pptx`.
 #'
-#' @export
-#'
-#' @examples
-#' \dontrun{
-#' install_pptx()
-#' }
-install_pptx <- function(verbose = TRUE) {
-  paths <- reportifyr::get_venv_uv_paths()
-  uv <- paths$uv
-  venv <- paths$venv
-  python_exe <- file.path(venv, "bin", "python")
+#' @keywords internal
+#' @noRd
+pptx_importable <- function(venv_path) {
+  if (!dir.exists(venv_path)) return(FALSE)
 
-  pptx_version <- getOption("python-pptx.version", default = "1.0.2")
-
-  # Check if python-pptx is already installed
-  if (verbose) message("  Checking if python-pptx is already installed...")
-  check_result <- processx::run(
-    command = python_exe,
-    args = c("-c", "import pptx; print(pptx.__version__)"),
-    error_on_status = FALSE,
-    stdout = "|",
-    stderr = "|"
-  )
-
-  if (check_result$status == 0) {
-    version <- trimws(check_result$stdout)
-    if (verbose) message("  python-pptx already installed (version ", version, ")")
-    return(invisible(TRUE))
-  }
-
-  # Not installed, proceed with installation
-  if (verbose) message("  Installing python-pptx==", pptx_version, "...")
-
-  result <- processx::run(
-    command = uv,
-    args = c(
-      "pip", "install", paste0("python-pptx==", pptx_version),
-      paste0("--python=", python_exe)
-    ),
-    echo = FALSE,
-    stdout = "|",
-    stderr = "|",
-    error_on_status = FALSE
-  )
-
-  if (result$status == 0) {
-    if (verbose) message("  python-pptx installed successfully")
-    invisible(TRUE)
+  python_exe <- if (.Platform$OS.type == "windows") {
+    file.path(venv_path, "Scripts", "python.exe")
   } else {
-    if (verbose) message("  python-pptx installation failed")
-    invisible(FALSE)
+    file.path(venv_path, "bin", "python")
   }
+  if (!file.exists(python_exe)) return(FALSE)
+
+  result <- tryCatch(
+    processx::run(
+      command = python_exe,
+      args = c("-c", "import pptx"),
+      error_on_status = FALSE,
+      stdout = "|",
+      stderr = "|"
+    ),
+    error = function(e) list(status = -1L)
+  )
+  isTRUE(result$status == 0)
 }

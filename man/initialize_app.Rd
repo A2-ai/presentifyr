@@ -4,26 +4,11 @@
 \alias{initialize_app}
 \title{Initialize presentifyr Application Environment}
 \usage{
-initialize_app(
-  project_dir = get_project_dir(),
-  report_dir_name = NULL,
-  outputs_dir_name = NULL,
-  install_python_deps = TRUE,
-  verbose = TRUE
-)
+initialize_app(project_dir = get_project_dir(), verbose = TRUE)
 }
 \arguments{
 \item{project_dir}{The file path to the main project directory.
 Must already exist. Default is \code{get_project_dir()}.}
-
-\item{report_dir_name}{The directory name for reports. Default is \code{NULL}
-(uses reportifyr default).}
-
-\item{outputs_dir_name}{The directory name for artifacts. Default is \code{NULL}
-(uses reportifyr default).}
-
-\item{install_python_deps}{Logical. Whether to install Python dependencies.
-Default is \code{TRUE}.}
 
 \item{verbose}{Logical. Print detailed initialization messages.
 Default is \code{TRUE}.}
@@ -31,21 +16,22 @@ Default is \code{TRUE}.}
 \value{
 Invisibly returns a list with initialization status:
 \itemize{
-\item \code{reportifyr}: Logical indicating reportifyr initialization success
-\item \code{python_pptx}: Logical indicating python-pptx installation success
+\item \code{venv}: Logical indicating \verb{.venv/} exists after the call
+\item \code{python_pptx}: Logical indicating python-pptx is importable
 \item \code{errors}: Character vector of any errors encountered
 }
 }
 \description{
-Performs all necessary initialization steps for presentifyr,
-including reportifyr project setup (uv, .venv, and base Python
-dependencies) and python-pptx installation.
+Bootstraps the Python environment presentifyr's Shiny app needs:
+calls \code{fyrstartr::initialize_python(groups = "presentifyr")} to
+install uv (if missing) and additively sync the \code{presentifyr}
+dependency group (python-pptx, pillow) into \verb{.venv/} from the
+fyrstartr-bundled lockfile. The sync runs in \code{--inexact} mode, so
+any packages already present in the venv from prior fyr-package
+installs are left in place.
 }
 \examples{
 \dontrun{
 initialize_app()
-
-# Skip Python dependencies
-initialize_app(install_python_deps = FALSE)
 }
 }
