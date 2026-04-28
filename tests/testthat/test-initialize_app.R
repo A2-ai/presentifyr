@@ -1,125 +1,61 @@
-test_that("initialize_app returns the venv/python_pptx/errors structure", {
-  venv_parent <- tempfile()
-  dir.create(venv_parent)
-  dir.create(file.path(venv_parent, ".venv"))
-  withr::local_options(list(venv_dir = venv_parent))
-
-  mockery::stub(initialize_app, "pptx_importable", function(...) TRUE)
+test_that("initialize_app returns the success/errors structure", {
+  mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) NULL)
 
   result <- suppressMessages(initialize_app(verbose = FALSE))
 
   expect_type(result, "list")
-  expect_named(
-    result, c("venv", "python_pptx", "errors"), ignore.order = TRUE
-  )
-  expect_type(result$venv, "logical")
+  expect_named(result, c("success", "errors"), ignore.order = TRUE)
+  expect_type(result$success, "logical")
   expect_type(result$errors, "character")
-
-  unlink(venv_parent, recursive = TRUE)
 })
 
-test_that("initialize_app skips fyrstartr when .venv exists and pptx imports", {
-  venv_parent <- tempfile()
-  dir.create(venv_parent)
-  dir.create(file.path(venv_parent, ".venv"))
-  withr::local_options(list(venv_dir = venv_parent))
-
-  fyrstartr_called <- FALSE
-  mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) {
-    fyrstartr_called <<- TRUE
-  })
-  mockery::stub(initialize_app, "pptx_importable", function(...) TRUE)
+test_that("initialize_app reports success when fyrstartr returns cleanly", {
+  mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) NULL)
 
   result <- suppressMessages(initialize_app(verbose = FALSE))
 
-  expect_true(result$venv)
-  expect_true(result$python_pptx)
-  expect_false(fyrstartr_called)
-
-  unlink(venv_parent, recursive = TRUE)
+  expect_true(result$success)
+  expect_length(result$errors, 0)
 })
 
-test_that("initialize_app calls fyrstartr(groups='presentifyr') when .venv is missing", {
-  venv_parent <- tempfile()
-  dir.create(venv_parent)
-  withr::local_options(list(venv_dir = venv_parent))
-
+test_that("initialize_app passes groups='presentifyr' to fyrstartr", {
   groups_seen <- NULL
   mockery::stub(initialize_app, "fyrstartr::initialize_python", function(continue, groups, ...) {
     groups_seen <<- groups
-    dir.create(file.path(venv_parent, ".venv"))
+    NULL
   })
-  mockery::stub(initialize_app, "pptx_importable", function(...) TRUE)
 
-  result <- suppressMessages(initialize_app(verbose = FALSE))
+  suppressMessages(initialize_app(verbose = FALSE))
 
-  expect_true(result$venv)
   expect_equal(groups_seen, "presentifyr")
-
-  unlink(venv_parent, recursive = TRUE)
 })
 
-test_that("initialize_app re-syncs presentifyr group when .venv exists but pptx is missing", {
-  venv_parent <- tempfile()
-  dir.create(venv_parent)
-  dir.create(file.path(venv_parent, ".venv"))
-  withr::local_options(list(venv_dir = venv_parent))
-
-  call_count <- 0L
-  groups_seen <- NULL
-  mockery::stub(initialize_app, "fyrstartr::initialize_python", function(continue, groups, ...) {
-    call_count <<- call_count + 1L
-    groups_seen <<- groups
-  })
-  ## First pptx_importable call returns FALSE (recovery branch fires);
-  ## second call (post-resync) returns TRUE.
-  importable_calls <- 0L
-  mockery::stub(initialize_app, "pptx_importable", function(...) {
-    importable_calls <<- importable_calls + 1L
-    importable_calls > 1L
-  })
-
-  result <- suppressMessages(initialize_app(verbose = FALSE))
-
-  expect_true(result$venv)
-  expect_true(result$python_pptx)
-  expect_equal(call_count, 1L)
-  expect_equal(groups_seen, "presentifyr")
-
-  unlink(venv_parent, recursive = TRUE)
-})
-
-test_that("initialize_app captures fyrstartr failure in status$errors", {
-  venv_parent <- tempfile()
-  dir.create(venv_parent)
-  withr::local_options(list(venv_dir = venv_parent))
-
+test_that("initialize_app captures fyrstartr error message in status$errors", {
   mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) {
     stop("fyrstartr blew up")
   })
-  mockery::stub(initialize_app, "pptx_importable", function(...) FALSE)
 
   result <- suppressMessages(initialize_app(verbose = FALSE))
 
-  expect_false(result$venv)
-  expect_false(result$python_pptx)
+  expect_false(result$success)
   expect_true(any(grepl("fyrstartr blew up", result$errors)))
-
-  unlink(venv_parent, recursive = TRUE)
 })
 
-test_that("initialize_app reports python_pptx FALSE when import check fails post-resync", {
-  venv_parent <- tempfile()
-  dir.create(venv_parent)
-  dir.create(file.path(venv_parent, ".venv"))
-  withr::local_options(list(venv_dir = venv_parent))
-
-  mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) NULL)
-  mockery::stub(initialize_app, "pptx_importable", function(...) FALSE)
+test_that("initialize_app surfaces e$stderr when present", {
+  mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) {
+    e <- structure(
+      class = c("processx_error", "error", "condition"),
+      list(
+        message = "System command 'uv_setup.sh' failed",
+        stderr = "error: Group 'foo' is not defined in the project's `dependency-groups` table",
+        call = NULL
+      )
+    )
+    stop(e)
+  })
 
   result <- suppressMessages(initialize_app(verbose = FALSE))
 
-  expect_false(result$python_pptx)
-
-  unlink(venv_parent, recursive = TRUE)
+  expect_false(result$success)
+  expect_true(any(grepl("Group 'foo' is not defined", result$errors)))
 })

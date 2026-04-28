@@ -4,31 +4,31 @@
 \alias{initialize_app}
 \title{Initialize presentifyr Application Environment}
 \usage{
-initialize_app(project_dir = get_project_dir(), verbose = TRUE)
+initialize_app(verbose = TRUE)
 }
 \arguments{
-\item{project_dir}{The file path to the main project directory.
-Must already exist. Default is \code{get_project_dir()}.}
-
-\item{verbose}{Logical. Print detailed initialization messages.
-Default is \code{TRUE}.}
+\item{verbose}{Logical. Print initialization messages. Default \code{TRUE}.}
 }
 \value{
-Invisibly returns a list with initialization status:
+Invisibly a list:
 \itemize{
-\item \code{venv}: Logical indicating \verb{.venv/} exists after the call
-\item \code{python_pptx}: Logical indicating python-pptx is importable
-\item \code{errors}: Character vector of any errors encountered
+\item \code{success}: Logical. \code{TRUE} iff fyrstartr returned without error.
+\item \code{errors}: Character vector of any error detail captured.
 }
 }
 \description{
-Bootstraps the Python environment presentifyr's Shiny app needs:
-calls \code{fyrstartr::initialize_python(groups = "presentifyr")} to
-install uv (if missing) and additively sync the \code{presentifyr}
+Bootstraps the Python environment presentifyr's Shiny app needs by
+calling \code{fyrstartr::initialize_python(groups = "presentifyr")}. This
+installs uv (if missing) and additively syncs the \code{presentifyr}
 dependency group (python-pptx, pillow) into \verb{.venv/} from the
-fyrstartr-bundled lockfile. The sync runs in \code{--inexact} mode, so
-any packages already present in the venv from prior fyr-package
-installs are left in place.
+fyrstartr-bundled lockfile. The sync runs in \code{--inexact} mode, so any
+packages already present in the venv from prior fyr-package installs
+are left in place.
+
+\verb{uv sync --frozen --inexact --group presentifyr} is idempotent — it
+creates the venv if missing, installs the group if absent, and is a
+fast no-op if everything is already in place. Re-running this
+function is therefore safe and cheap.
 }
 \examples{
 \dontrun{

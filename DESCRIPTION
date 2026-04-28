@@ -29,7 +29,6 @@ Imports:
     jsTreeR (>= 2.6.0),
     log4r,
     pkglite (>= 0.2.2),
-    processx (>= 3.8.4),
     rlang,
     yaml,
     shiny (>= 1.8.1.1),
