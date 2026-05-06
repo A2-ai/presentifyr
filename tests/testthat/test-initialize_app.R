@@ -1,4 +1,5 @@
 test_that("initialize_app returns the success/errors structure", {
+  mockery::stub(initialize_app, "fyrstartr::write_group_to_pyproject", function(...) invisible(FALSE))
   mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) NULL)
 
   result <- suppressMessages(initialize_app(verbose = FALSE))
@@ -10,6 +11,7 @@ test_that("initialize_app returns the success/errors structure", {
 })
 
 test_that("initialize_app reports success when fyrstartr returns cleanly", {
+  mockery::stub(initialize_app, "fyrstartr::write_group_to_pyproject", function(...) invisible(FALSE))
   mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) NULL)
 
   result <- suppressMessages(initialize_app(verbose = FALSE))
@@ -20,6 +22,11 @@ test_that("initialize_app reports success when fyrstartr returns cleanly", {
 
 test_that("initialize_app passes groups='presentifyr' to fyrstartr", {
   groups_seen <- NULL
+  name_seen <- NULL
+  mockery::stub(initialize_app, "fyrstartr::write_group_to_pyproject", function(name, ...) {
+    name_seen <<- name
+    invisible(FALSE)
+  })
   mockery::stub(initialize_app, "fyrstartr::initialize_python", function(continue, groups, ...) {
     groups_seen <<- groups
     NULL
@@ -27,10 +34,12 @@ test_that("initialize_app passes groups='presentifyr' to fyrstartr", {
 
   suppressMessages(initialize_app(verbose = FALSE))
 
+  expect_equal(name_seen, "presentifyr")
   expect_equal(groups_seen, "presentifyr")
 })
 
 test_that("initialize_app captures fyrstartr error message in status$errors", {
+  mockery::stub(initialize_app, "fyrstartr::write_group_to_pyproject", function(...) invisible(FALSE))
   mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) {
     stop("fyrstartr blew up")
   })
@@ -42,6 +51,7 @@ test_that("initialize_app captures fyrstartr error message in status$errors", {
 })
 
 test_that("initialize_app surfaces e$stderr when present", {
+  mockery::stub(initialize_app, "fyrstartr::write_group_to_pyproject", function(...) invisible(FALSE))
   mockery::stub(initialize_app, "fyrstartr::initialize_python", function(...) {
     e <- structure(
       class = c("processx_error", "error", "condition"),
