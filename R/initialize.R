@@ -41,9 +41,7 @@ initialize_app <- function(verbose = TRUE) {
   tryCatch(
     {
       fyrstartr::write_group_to_pyproject("presentifyr")
-      fyrstartr::initialize_python(
-        continue = "Y", groups = "presentifyr"
-      )
+      fyrstartr::initialize_python(groups = "presentifyr")
       status$success <- TRUE
     },
     error = function(e) {
