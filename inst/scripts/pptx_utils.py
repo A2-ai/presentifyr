@@ -174,18 +174,25 @@ def format_slide_notes(
                 f"or table_footnotes sections of footnotes YAML"
             )
         resolved = mt_defs[meta_type]
-        if isinstance(resolved, str) and resolved:
-            meta_type_text = (
-                f"{resolved} " if resolved.endswith('.') else f"{resolved}. "
-            )
+        if isinstance(resolved, str):
+            # Right-trim before checking trailing period: YAML folded
+            # scalars can leave a trailing space after the period.
+            resolved = resolved.rstrip()
+            if resolved:
+                meta_type_text = (
+                    f"{resolved} "
+                    if resolved.endswith('.')
+                    else f"{resolved}. "
+                )
 
     # Notes: meta_type text + object_meta.footnotes.notes (joined with ". ")
     notes_list = footnotes.get('notes', [])
     user_notes_text = ''
     if notes_list and any(n for n in notes_list if n):
+        normalized = (n.rstrip() for n in notes_list if n)
         user_notes_text = ' '.join(
             n if n.endswith('.') else f"{n}."
-            for n in notes_list if n
+            for n in normalized if n
         )
 
     combined_notes = f"{meta_type_text}{user_notes_text}"

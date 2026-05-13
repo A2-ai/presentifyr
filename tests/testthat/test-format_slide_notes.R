@@ -181,6 +181,28 @@ test_that("format_slide_notes resolves meta_type from merged fig+table dict", {
   expect_true(grepl("Notes: Demographics table\\.", result))
 })
 
+test_that("format_slide_notes does not double-period meta_type ending in '. '", {
+  ## YAML folded scalars leave a trailing space after the final period.
+  metadata <- list(
+    source_meta = list(path = "x.R"),
+    object_meta = list(
+      meta_type = "conc_time_plot",
+      footnotes = list(
+        notes = list("Testing another note to see compatibility"),
+        abbreviations = list()
+      )
+    )
+  )
+  defs <- list(conc_time_plot = "Lower LLQ = 2 ug/mL. ")
+
+  result <- format_slide_notes(metadata, meta_type_definitions = defs)
+
+  expect_false(grepl("\\. \\. ", result))
+  expect_true(grepl(
+    "Notes: Lower LLQ = 2 ug/mL\\. Testing another note", result
+  ))
+})
+
 test_that("format_slide_notes appends period to meta_type text missing one", {
   metadata <- list(
     source_meta = list(path = "x.R"),

@@ -485,11 +485,16 @@ format_slide_notes <- function(metadata,
       ))
     }
     resolved <- meta_type_definitions[[meta_type]]
-    if (is.character(resolved) && nzchar(resolved)) {
-      meta_type_text <- if (endsWith(resolved, ".")) {
-        paste0(resolved, " ")
-      } else {
-        paste0(resolved, ". ")
+    if (is.character(resolved)) {
+      ## Right-trim before checking trailing period: YAML folded
+      ## scalars can leave a trailing space after the period.
+      resolved <- trimws(resolved, which = "right")
+      if (nzchar(resolved)) {
+        meta_type_text <- if (endsWith(resolved, ".")) {
+          paste0(resolved, " ")
+        } else {
+          paste0(resolved, ". ")
+        }
       }
     }
   }
@@ -498,6 +503,7 @@ format_slide_notes <- function(metadata,
   user_notes_text <- ""
   if (length(notes_list) > 0 && !all(notes_list == "")) {
     user_notes_text <- paste(vapply(notes_list, function(n) {
+      n <- trimws(n, which = "right")
       if (!endsWith(n, ".")) paste0(n, ".") else n
     }, character(1)), collapse = " ")
   }
