@@ -13,7 +13,17 @@
 
 .bslib-sidebar-layout > .main {
   min-width: 0;
+  max-width: 100%;
   overflow: auto;
+}
+
+/* Propagate shrinking past intermediate bslib flex-item layers so the
+ * rendered Shiny output (.shiny-html-output) centers against .main's
+ * visible width instead of inheriting a min-content size wider than .main. */
+.bslib-sidebar-layout > .main .bslib-page-main,
+.bslib-sidebar-layout > .main .shiny-html-output {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .sidebar-resize-handle {
