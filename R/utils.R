@@ -317,22 +317,24 @@ load_abbreviation_definitions <- function(yaml_path = NULL) {
   })
 }
 
-#' Load figure_footnotes (meta_type definitions) from a YAML file
+#' Load meta_type definitions (figure + table footnotes) from a YAML file
 #'
-#' @description Mirrors reportifyr's `figure_footnotes` lookup:
-#'   `object_meta$meta_type` is a key into this dict, and the resolved
-#'   text is prepended to the Notes line. Presentifyr only renders
-#'   images (the figure path), so only the `figure_footnotes` section
-#'   is read.
+#' @description `object_meta$meta_type` is a key into either the
+#'   `figure_footnotes` or `table_footnotes` section of
+#'   `standard_footnotes.yaml`. Presentifyr renders both figure PNGs
+#'   and table-as-PNG artifacts, so both sections are merged into a
+#'   single flat dict for lookup. Keys are expected to be unique
+#'   across the two sections; if both define the same key,
+#'   `table_footnotes` wins via override.
 #'
 #' @param yaml_path The file path to the YAML. Default is NULL. If
 #'   NULL, uses `<report_dir>/standard_footnotes.yaml`.
 #'
 #' @return A named list mapping meta_type keys to footnote text, or
-#'   an empty list if the YAML is missing or has no figure_footnotes.
+#'   an empty list if the YAML is missing or has neither section.
 #' @keywords internal
 #' @noRd
-load_figure_footnotes <- function(yaml_path = NULL) {
+load_meta_type_definitions <- function(yaml_path = NULL) {
   if (is.null(yaml_path)) {
     yaml_path <- file.path(get_report_dir(), "standard_footnotes.yaml")
   }
@@ -343,10 +345,12 @@ load_figure_footnotes <- function(yaml_path = NULL) {
 
   tryCatch({
     yaml_content <- yaml::read_yaml(yaml_path)
-    yaml_content$figure_footnotes %||% list()
+    figure <- yaml_content$figure_footnotes %||% list()
+    table  <- yaml_content$table_footnotes  %||% list()
+    c(figure, table)
   }, error = function(e) {
     log4r::warn(.le$logger, paste(
-      "load_figure_footnotes: YAML parse error -", e$message
+      "load_meta_type_definitions: YAML parse error -", e$message
     ))
     list()
   })
@@ -441,19 +445,20 @@ format_source_line <- function(src, obj = NULL) {
 #' @param metadata A list containing the metadata
 #' @param abbreviation_definitions Named list mapping abbreviation
 #'   keys to their full forms. If NULL, raw keys are displayed.
-#' @param figure_footnotes Named list mapping `meta_type` keys to
-#'   footnote text (the `figure_footnotes` section of
-#'   `standard_footnotes.yaml`). When the metadata's
-#'   `object_meta$meta_type` is non-NULL and not `"NA"`, the resolved
-#'   text is prepended to the Notes line. Errors if `meta_type` is set
-#'   but not found in `figure_footnotes`, matching reportifyr.
+#' @param meta_type_definitions Named list mapping `meta_type` keys
+#'   to footnote text. Built from the merged `figure_footnotes` and
+#'   `table_footnotes` sections of `standard_footnotes.yaml`
+#'   (presentifyr renders both figures and table-as-PNG artifacts).
+#'   When the metadata's `object_meta$meta_type` is non-NULL and not
+#'   `"NA"`, the resolved text is prepended to the Notes line. Errors
+#'   if `meta_type` is set but not found in this dict.
 #'
 #' @return A formatted string for slide notes
 #' @keywords internal
 #' @noRd
 format_slide_notes <- function(metadata,
                                abbreviation_definitions = NULL,
-                               figure_footnotes = NULL) {
+                               meta_type_definitions = NULL) {
   lines <- character()
 
   source_text <- format_source_line(
@@ -469,17 +474,17 @@ format_slide_notes <- function(metadata,
   meta_type_text <- ""
   if (is.character(meta_type) && length(meta_type) == 1L &&
         nzchar(meta_type) && meta_type != "NA") {
-    figure_footnotes <- figure_footnotes %||% list()
-    if (!(meta_type %in% names(figure_footnotes))) {
+    meta_type_definitions <- meta_type_definitions %||% list()
+    if (!(meta_type %in% names(meta_type_definitions))) {
       stop(sprintf(
         paste0(
-          "meta_type '%s' not found in figure_footnotes section ",
-          "of footnotes YAML"
+          "meta_type '%s' not found in figure_footnotes or ",
+          "table_footnotes sections of footnotes YAML"
         ),
         meta_type
       ))
     }
-    resolved <- figure_footnotes[[meta_type]]
+    resolved <- meta_type_definitions[[meta_type]]
     if (is.character(resolved) && nzchar(resolved)) {
       meta_type_text <- if (endsWith(resolved, ".")) {
         paste0(resolved, " ")

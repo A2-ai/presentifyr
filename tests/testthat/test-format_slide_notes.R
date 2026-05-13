@@ -140,7 +140,7 @@ test_that("decode_abbreviations strips trailing period from definitions", {
   expect_equal(result, "AUC: area under the curve.")
 })
 
-test_that("format_slide_notes prepends figure_footnotes[meta_type] to Notes", {
+test_that("format_slide_notes prepends meta_type definition to Notes", {
   metadata <- list(
     source_meta = list(path = "scripts/run.R"),
     object_meta = list(
@@ -154,12 +154,31 @@ test_that("format_slide_notes prepends figure_footnotes[meta_type] to Notes", {
   fig_fn <- list(efficacy = "Efficacy population.")
 
   result <- format_slide_notes(
-    metadata, figure_footnotes = fig_fn
+    metadata, meta_type_definitions = fig_fn
   )
 
   expect_true(grepl(
     "Notes: Efficacy population\\. Population was adults\\.", result
   ))
+})
+
+test_that("format_slide_notes resolves meta_type from merged fig+table dict", {
+  metadata <- list(
+    source_meta = list(path = "x.R"),
+    object_meta = list(
+      meta_type = "demographics",
+      footnotes = list(notes = list(), abbreviations = list())
+    )
+  )
+  ## demographics lives in the table_footnotes side of the merged dict
+  defs <- list(
+    efficacy = "Efficacy population.",
+    demographics = "Demographics table."
+  )
+
+  result <- format_slide_notes(metadata, meta_type_definitions = defs)
+
+  expect_true(grepl("Notes: Demographics table\\.", result))
 })
 
 test_that("format_slide_notes appends period to meta_type text missing one", {
@@ -172,7 +191,7 @@ test_that("format_slide_notes appends period to meta_type text missing one", {
   )
   fig_fn <- list(efficacy = "Efficacy population")
 
-  result <- format_slide_notes(metadata, figure_footnotes = fig_fn)
+  result <- format_slide_notes(metadata, meta_type_definitions = fig_fn)
 
   expect_true(grepl("Notes: Efficacy population\\.", result))
 })
@@ -186,12 +205,12 @@ test_that("format_slide_notes ignores meta_type when value is 'NA'", {
     )
   )
 
-  result <- format_slide_notes(metadata, figure_footnotes = list())
+  result <- format_slide_notes(metadata, meta_type_definitions = list())
 
   expect_true(grepl("Notes: N/A", result))
 })
 
-test_that("format_slide_notes errors on meta_type missing from figure_footnotes", {
+test_that("format_slide_notes errors on meta_type missing from definitions", {
   metadata <- list(
     source_meta = list(path = "x.R"),
     object_meta = list(
@@ -201,7 +220,10 @@ test_that("format_slide_notes errors on meta_type missing from figure_footnotes"
   )
 
   expect_error(
-    format_slide_notes(metadata, figure_footnotes = list(safety = "Safety.")),
+    format_slide_notes(
+      metadata,
+      meta_type_definitions = list(safety = "Safety.")
+    ),
     "meta_type 'efficacy' not found"
   )
 })

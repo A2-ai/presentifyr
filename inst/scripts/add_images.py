@@ -331,7 +331,7 @@ def add_images(output_pptx, config, base_pptx=None):
     font_settings = config.get('font_settings', {})
     image_keys = config.get('image_keys', {})
     abbrev_defs = config.get('abbreviation_definitions', None)
-    figure_footnotes = config.get('figure_footnotes', None)
+    meta_type_definitions = config.get('meta_type_definitions', None)
 
     logger.info(f"Total slides to create: {len(slide_groups)}")
 
@@ -384,7 +384,7 @@ def add_images(output_pptx, config, base_pptx=None):
             for name, meta in slide_metadata_list.items():
                 combined_parts.append(
                 f"## {name}\n"
-                f"{format_slide_notes(meta, abbrev_defs, figure_footnotes)}"
+                f"{format_slide_notes(meta, abbrev_defs, meta_type_definitions)}"
             )
             combined_notes = "\n\n".join(combined_parts)
 

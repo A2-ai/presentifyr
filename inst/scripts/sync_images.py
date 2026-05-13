@@ -270,7 +270,7 @@ def sync_images(
     output_pptx,
     image_dict,
     abbreviation_definitions=None,
-    figure_footnotes=None,
+    meta_type_definitions=None,
 ):
     logger = get_logger()
     logger.debug(f"Starting sync images Python function")
@@ -367,7 +367,7 @@ def sync_images(
                 # Combine notes from all images (matching add_images.R behavior)
                 combined_notes = "\n\n".join(
                     f"## {name}\n"
-                    f"{format_slide_notes(meta, abbreviation_definitions, figure_footnotes)}"
+                    f"{format_slide_notes(meta, abbreviation_definitions, meta_type_definitions)}"
                     for name, meta in slide_metadata_list.items()
                 )
 
@@ -424,7 +424,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output_pptx', type=str, required=True, help="Output pptx file path")
     parser.add_argument('-d', '--image_dict', type=str, required=True, help="Path to JSON file containing image dictionary")
     parser.add_argument('-a', '--abbreviations', type=str, default=None, help="Path to JSON file containing abbreviation definitions")
-    parser.add_argument('-f', '--figure_footnotes', type=str, default=None, help="Path to JSON file containing figure_footnotes (meta_type -> text)")
+    parser.add_argument('-m', '--meta_type_definitions', type=str, default=None, help="Path to JSON file mapping meta_type keys to footnote text (merged figure_footnotes + table_footnotes)")
 
     args = parser.parse_args()
 
@@ -436,15 +436,15 @@ if __name__ == "__main__":
         with open(args.abbreviations, 'r') as f:
             abbrev_defs = json.load(f)
 
-    figure_footnotes = None
-    if args.figure_footnotes:
-        with open(args.figure_footnotes, 'r') as f:
-            figure_footnotes = json.load(f)
+    meta_type_definitions = None
+    if args.meta_type_definitions:
+        with open(args.meta_type_definitions, 'r') as f:
+            meta_type_definitions = json.load(f)
 
     sync_images(
         input_pptx=args.input_pptx,
         output_pptx=args.output_pptx,
         image_dict=image_dict,
         abbreviation_definitions=abbrev_defs,
-        figure_footnotes=figure_footnotes,
+        meta_type_definitions=meta_type_definitions,
     )

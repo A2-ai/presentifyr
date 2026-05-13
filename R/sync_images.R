@@ -54,10 +54,10 @@ sync_images <- function(input_pptx,
     auto_unbox = TRUE, pretty = TRUE
   )
 
-  figure_footnotes <- load_figure_footnotes()
-  temp_fig_fn <- tempfile(fileext = ".json")
+  meta_type_definitions <- load_meta_type_definitions()
+  temp_meta_types <- tempfile(fileext = ".json")
   jsonlite::write_json(
-    figure_footnotes, temp_fig_fn,
+    meta_type_definitions, temp_meta_types,
     auto_unbox = TRUE, pretty = TRUE
   )
 
@@ -69,7 +69,7 @@ sync_images <- function(input_pptx,
     script_args = c(
       script, "-i", input_pptx, "-o", output_pptx,
       "-d", temp_image_dict, "-a", temp_abbrev,
-      "-f", temp_fig_fn
+      "-m", temp_meta_types
     ),
     label = "Sync images"
   )

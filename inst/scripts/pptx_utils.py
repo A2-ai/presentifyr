@@ -132,7 +132,7 @@ def _format_source_line(src, obj):
 
 
 def format_slide_notes(
-    metadata, abbreviation_definitions=None, figure_footnotes=None
+    metadata, abbreviation_definitions=None, meta_type_definitions=None
 ):
     """Format slide notes with metadata.
 
@@ -140,12 +140,12 @@ def format_slide_notes(
         metadata: dict containing the metadata (from load_metadata_for_image)
         abbreviation_definitions: dict mapping abbreviation keys to
             their full forms. If None, raw keys are displayed.
-        figure_footnotes: dict mapping `meta_type` keys to footnote
-            text (the `figure_footnotes` section of
-            standard_footnotes.yaml). When the metadata's
-            object_meta.meta_type is set and not "NA", the resolved
-            text is prepended to Notes. Raises KeyError if meta_type
-            is set but missing from this dict, matching reportifyr.
+        meta_type_definitions: dict mapping `meta_type` keys to
+            footnote text, built from the merged `figure_footnotes`
+            and `table_footnotes` sections of standard_footnotes.yaml.
+            When the metadata's object_meta.meta_type is set and not
+            "NA", the resolved text is prepended to Notes. Raises
+            KeyError if meta_type is set but missing from this dict.
 
     Returns:
         Formatted string for slide notes
@@ -167,13 +167,13 @@ def format_slide_notes(
     meta_type = object_meta.get('meta_type')
     meta_type_text = ''
     if isinstance(meta_type, str) and meta_type and meta_type != 'NA':
-        fig_fn = figure_footnotes or {}
-        if meta_type not in fig_fn:
+        mt_defs = meta_type_definitions or {}
+        if meta_type not in mt_defs:
             raise KeyError(
                 f"meta_type '{meta_type}' not found in figure_footnotes "
-                f"section of footnotes YAML"
+                f"or table_footnotes sections of footnotes YAML"
             )
-        resolved = fig_fn[meta_type]
+        resolved = mt_defs[meta_type]
         if isinstance(resolved, str) and resolved:
             meta_type_text = (
                 f"{resolved} " if resolved.endswith('.') else f"{resolved}. "
