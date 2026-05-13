@@ -58,6 +58,7 @@ add_images <- function(files, output_pptx,
 
   ## Build config for Python script
   abbrev_defs <- load_abbreviation_definitions()
+  figure_footnotes <- load_figure_footnotes()
 
   config <- list(
     slide_layout_name = slide_layout_name,
@@ -65,7 +66,8 @@ add_images <- function(files, output_pptx,
     slide_positions = slide_positions,
     font_settings = font_settings,
     image_keys = as.list(image_keys),
-    abbreviation_definitions = abbrev_defs
+    abbreviation_definitions = abbrev_defs,
+    figure_footnotes = figure_footnotes
   )
 
   temp_config <- tempfile(fileext = ".json")

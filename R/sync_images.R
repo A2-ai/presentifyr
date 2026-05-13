@@ -54,6 +54,13 @@ sync_images <- function(input_pptx,
     auto_unbox = TRUE, pretty = TRUE
   )
 
+  figure_footnotes <- load_figure_footnotes()
+  temp_fig_fn <- tempfile(fileext = ".json")
+  jsonlite::write_json(
+    figure_footnotes, temp_fig_fn,
+    auto_unbox = TRUE, pretty = TRUE
+  )
+
   script <- system.file(
     "scripts/sync_images.py", package = "presentifyr"
   )
@@ -61,7 +68,8 @@ sync_images <- function(input_pptx,
   result <- run_python_script(
     script_args = c(
       script, "-i", input_pptx, "-o", output_pptx,
-      "-d", temp_image_dict, "-a", temp_abbrev
+      "-d", temp_image_dict, "-a", temp_abbrev,
+      "-f", temp_fig_fn
     ),
     label = "Sync images"
   )

@@ -317,6 +317,41 @@ load_abbreviation_definitions <- function(yaml_path = NULL) {
   })
 }
 
+#' Load figure_footnotes (meta_type definitions) from a YAML file
+#'
+#' @description Mirrors reportifyr's `figure_footnotes` lookup:
+#'   `object_meta$meta_type` is a key into this dict, and the resolved
+#'   text is prepended to the Notes line. Presentifyr only renders
+#'   images (the figure path), so only the `figure_footnotes` section
+#'   is read.
+#'
+#' @param yaml_path The file path to the YAML. Default is NULL. If
+#'   NULL, uses `<report_dir>/standard_footnotes.yaml`.
+#'
+#' @return A named list mapping meta_type keys to footnote text, or
+#'   an empty list if the YAML is missing or has no figure_footnotes.
+#' @keywords internal
+#' @noRd
+load_figure_footnotes <- function(yaml_path = NULL) {
+  if (is.null(yaml_path)) {
+    yaml_path <- file.path(get_report_dir(), "standard_footnotes.yaml")
+  }
+
+  if (!nzchar(yaml_path) || !file.exists(yaml_path)) {
+    return(list())
+  }
+
+  tryCatch({
+    yaml_content <- yaml::read_yaml(yaml_path)
+    yaml_content$figure_footnotes %||% list()
+  }, error = function(e) {
+    log4r::warn(.le$logger, paste(
+      "load_figure_footnotes: YAML parse error -", e$message
+    ))
+    list()
+  })
+}
+
 #' Load metadata JSON for an image file
 #'
 #' @param image_path The path to the image file
@@ -356,12 +391,19 @@ load_image_metadata <- function(image_path) {
 #' @param metadata A list containing the metadata
 #' @param abbreviation_definitions Named list mapping abbreviation
 #'   keys to their full forms. If NULL, raw keys are displayed.
+#' @param figure_footnotes Named list mapping `meta_type` keys to
+#'   footnote text (the `figure_footnotes` section of
+#'   `standard_footnotes.yaml`). When the metadata's
+#'   `object_meta$meta_type` is non-NULL and not `"NA"`, the resolved
+#'   text is prepended to the Notes line. Errors if `meta_type` is set
+#'   but not found in `figure_footnotes`, matching reportifyr.
 #'
 #' @return A formatted string for slide notes
 #' @keywords internal
 #' @noRd
 format_slide_notes <- function(metadata,
-                               abbreviation_definitions = NULL) {
+                               abbreviation_definitions = NULL,
+                               figure_footnotes = NULL) {
   lines <- character()
 
   source_path <- metadata$source_meta$path %||% ""
@@ -376,12 +418,41 @@ format_slide_notes <- function(metadata,
     lines <- c(lines, "Source: N/A")
   }
 
+  meta_type <- metadata$object_meta$meta_type
+  meta_type_text <- ""
+  if (is.character(meta_type) && length(meta_type) == 1L &&
+        nzchar(meta_type) && meta_type != "NA") {
+    figure_footnotes <- figure_footnotes %||% list()
+    if (!(meta_type %in% names(figure_footnotes))) {
+      stop(sprintf(
+        paste0(
+          "meta_type '%s' not found in figure_footnotes section ",
+          "of footnotes YAML"
+        ),
+        meta_type
+      ))
+    }
+    resolved <- figure_footnotes[[meta_type]]
+    if (is.character(resolved) && nzchar(resolved)) {
+      meta_type_text <- if (endsWith(resolved, ".")) {
+        paste0(resolved, " ")
+      } else {
+        paste0(resolved, ". ")
+      }
+    }
+  }
+
   notes_list <- metadata$object_meta$footnotes$notes
+  user_notes_text <- ""
   if (length(notes_list) > 0 && !all(notes_list == "")) {
-    notes_text <- paste(vapply(notes_list, function(n) {
+    user_notes_text <- paste(vapply(notes_list, function(n) {
       if (!endsWith(n, ".")) paste0(n, ".") else n
     }, character(1)), collapse = " ")
-    lines <- c(lines, paste0("Notes: ", notes_text))
+  }
+
+  combined_notes <- paste0(meta_type_text, user_notes_text)
+  if (nzchar(combined_notes)) {
+    lines <- c(lines, paste0("Notes: ", combined_notes))
   } else {
     lines <- c(lines, "Notes: N/A")
   }

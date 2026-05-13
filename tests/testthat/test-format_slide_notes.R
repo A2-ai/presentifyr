@@ -139,3 +139,84 @@ test_that("decode_abbreviations strips trailing period from definitions", {
 
   expect_equal(result, "AUC: area under the curve.")
 })
+
+test_that("format_slide_notes prepends figure_footnotes[meta_type] to Notes", {
+  metadata <- list(
+    source_meta = list(path = "scripts/run.R"),
+    object_meta = list(
+      meta_type = "efficacy",
+      footnotes = list(
+        notes = list("Population was adults."),
+        abbreviations = list()
+      )
+    )
+  )
+  fig_fn <- list(efficacy = "Efficacy population.")
+
+  result <- format_slide_notes(
+    metadata, figure_footnotes = fig_fn
+  )
+
+  expect_true(grepl(
+    "Notes: Efficacy population\\. Population was adults\\.", result
+  ))
+})
+
+test_that("format_slide_notes appends period to meta_type text missing one", {
+  metadata <- list(
+    source_meta = list(path = "x.R"),
+    object_meta = list(
+      meta_type = "efficacy",
+      footnotes = list(notes = list(), abbreviations = list())
+    )
+  )
+  fig_fn <- list(efficacy = "Efficacy population")
+
+  result <- format_slide_notes(metadata, figure_footnotes = fig_fn)
+
+  expect_true(grepl("Notes: Efficacy population\\.", result))
+})
+
+test_that("format_slide_notes ignores meta_type when value is 'NA'", {
+  metadata <- list(
+    source_meta = list(path = "x.R"),
+    object_meta = list(
+      meta_type = "NA",
+      footnotes = list(notes = list(), abbreviations = list())
+    )
+  )
+
+  result <- format_slide_notes(metadata, figure_footnotes = list())
+
+  expect_true(grepl("Notes: N/A", result))
+})
+
+test_that("format_slide_notes errors when meta_type is missing from figure_footnotes", {
+  metadata <- list(
+    source_meta = list(path = "x.R"),
+    object_meta = list(
+      meta_type = "efficacy",
+      footnotes = list(notes = list(), abbreviations = list())
+    )
+  )
+
+  expect_error(
+    format_slide_notes(metadata, figure_footnotes = list(safety = "Safety.")),
+    "meta_type 'efficacy' not found"
+  )
+})
+
+test_that("format_slide_notes errors when meta_type is set but figure_footnotes is NULL", {
+  metadata <- list(
+    source_meta = list(path = "x.R"),
+    object_meta = list(
+      meta_type = "efficacy",
+      footnotes = list(notes = list(), abbreviations = list())
+    )
+  )
+
+  expect_error(
+    format_slide_notes(metadata),
+    "meta_type 'efficacy' not found"
+  )
+})

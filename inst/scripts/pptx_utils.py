@@ -94,13 +94,21 @@ def decode_abbreviations(abbrev_list, definitions=None):
     return ', '.join(parts) + '.'
 
 
-def format_slide_notes(metadata, abbreviation_definitions=None):
+def format_slide_notes(
+    metadata, abbreviation_definitions=None, figure_footnotes=None
+):
     """Format slide notes with metadata.
 
     Args:
         metadata: dict containing the metadata (from load_metadata_for_image)
         abbreviation_definitions: dict mapping abbreviation keys to
             their full forms. If None, raw keys are displayed.
+        figure_footnotes: dict mapping `meta_type` keys to footnote
+            text (the `figure_footnotes` section of
+            standard_footnotes.yaml). When the metadata's
+            object_meta.meta_type is set and not "NA", the resolved
+            text is prepended to Notes. Raises KeyError if meta_type
+            is set but missing from this dict, matching reportifyr.
 
     Returns:
         Formatted string for slide notes
@@ -119,17 +127,36 @@ def format_slide_notes(metadata, abbreviation_definitions=None):
     else:
         lines.append("Source: N/A")
 
-    # Notes: object_meta.footnotes.notes (joined with ". ")
+    # meta_type lookup -> prepended to Notes
     object_meta = metadata.get('object_meta', {})
     footnotes = object_meta.get('footnotes', {})
-    notes_list = footnotes.get('notes', [])
+    meta_type = object_meta.get('meta_type')
+    meta_type_text = ''
+    if isinstance(meta_type, str) and meta_type and meta_type != 'NA':
+        fig_fn = figure_footnotes or {}
+        if meta_type not in fig_fn:
+            raise KeyError(
+                f"meta_type '{meta_type}' not found in figure_footnotes "
+                f"section of footnotes YAML"
+            )
+        resolved = fig_fn[meta_type]
+        if isinstance(resolved, str) and resolved:
+            meta_type_text = (
+                f"{resolved} " if resolved.endswith('.') else f"{resolved}. "
+            )
 
+    # Notes: meta_type text + object_meta.footnotes.notes (joined with ". ")
+    notes_list = footnotes.get('notes', [])
+    user_notes_text = ''
     if notes_list and any(n for n in notes_list if n):
-        notes_text = ' '.join(
+        user_notes_text = ' '.join(
             n if n.endswith('.') else f"{n}."
             for n in notes_list if n
         )
-        lines.append(f"Notes: {notes_text}")
+
+    combined_notes = f"{meta_type_text}{user_notes_text}"
+    if combined_notes:
+        lines.append(f"Notes: {combined_notes}")
     else:
         lines.append("Notes: N/A")
 
