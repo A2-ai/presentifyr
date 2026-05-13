@@ -94,6 +94,43 @@ def decode_abbreviations(abbrev_list, definitions=None):
     return ', '.join(parts) + '.'
 
 
+def _format_source_line(src, obj):
+    """Render the Source line. Mirrors reportifyr's _SOURCE_HANDLERS:
+    shiny -> "{app_name} v{app_version} {creation_time}"
+    script -> "{path} {latest_time}"
+    legacy (no type) -> path+latest_time or `text` verbatim
+    Returns '' when nothing is resolvable.
+    """
+    if not isinstance(src, dict):
+        return ''
+    obj = obj or {}
+    src_type = src.get('type')
+    if src_type == 'shiny':
+        app_name = src.get('app_name', '')
+        app_version = src.get('app_version', '')
+        creation = obj.get('creation_time', '')
+        if app_name and app_version:
+            return f"{app_name} v{app_version} {creation}".strip()
+        return ''
+    if src_type == 'script':
+        path = src.get('path', '')
+        latest_time = src.get('latest_time', '')
+        if path:
+            return f"{path} {latest_time}".strip()
+        return ''
+    # Legacy / no type discriminator
+    text = src.get('text')
+    if isinstance(text, str) and text:
+        return text
+    path = src.get('path', '')
+    latest_time = src.get('latest_time', '')
+    if path and latest_time:
+        return f"{path} {latest_time}"
+    if path:
+        return path
+    return ''
+
+
 def format_slide_notes(
     metadata, abbreviation_definitions=None, figure_footnotes=None
 ):
@@ -115,15 +152,12 @@ def format_slide_notes(
     """
     lines = []
 
-    # Source: source_meta.path + source_meta.latest_time
+    # Source line dispatches on source_meta.type (shiny/script/legacy)
     source_meta = metadata.get('source_meta', {})
-    source_path = source_meta.get('path', '')
-    source_time = source_meta.get('latest_time', '')
-
-    if source_path and source_time:
-        lines.append(f"Source: {source_path} {source_time}")
-    elif source_path:
-        lines.append(f"Source: {source_path}")
+    object_meta_for_src = metadata.get('object_meta', {}) or {}
+    source_text = _format_source_line(source_meta, object_meta_for_src)
+    if source_text:
+        lines.append(f"Source: {source_text}")
     else:
         lines.append("Source: N/A")
 

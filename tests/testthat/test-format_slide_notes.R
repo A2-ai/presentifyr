@@ -191,7 +191,7 @@ test_that("format_slide_notes ignores meta_type when value is 'NA'", {
   expect_true(grepl("Notes: N/A", result))
 })
 
-test_that("format_slide_notes errors when meta_type is missing from figure_footnotes", {
+test_that("format_slide_notes errors on meta_type missing from figure_footnotes", {
   metadata <- list(
     source_meta = list(path = "x.R"),
     object_meta = list(
@@ -206,7 +206,7 @@ test_that("format_slide_notes errors when meta_type is missing from figure_footn
   )
 })
 
-test_that("format_slide_notes errors when meta_type is set but figure_footnotes is NULL", {
+test_that("format_slide_notes errors when meta_type set but no fig footnotes", {
   metadata <- list(
     source_meta = list(path = "x.R"),
     object_meta = list(
@@ -219,4 +219,66 @@ test_that("format_slide_notes errors when meta_type is set but figure_footnotes 
     format_slide_notes(metadata),
     "meta_type 'efficacy' not found"
   )
+})
+
+test_that("format_slide_notes renders shiny source from app_name + version", {
+  metadata <- list(
+    source_meta = list(
+      type = "shiny",
+      app_name = "myapp",
+      app_version = "1.2.0"
+    ),
+    object_meta = list(
+      creation_time = "2026-05-13 09:00:00",
+      footnotes = list(notes = list(), abbreviations = list())
+    )
+  )
+
+  result <- format_slide_notes(metadata)
+  lines <- strsplit(result, "\n")[[1]]
+
+  expect_equal(lines[1], "Source: myapp v1.2.0 2026-05-13 09:00:00")
+})
+
+test_that("format_slide_notes renders script source from path + latest_time", {
+  metadata <- list(
+    source_meta = list(
+      type = "script",
+      path = "scripts/01-pk.R",
+      latest_time = "2026-04-20 12:00:00"
+    ),
+    object_meta = list(footnotes = list())
+  )
+
+  result <- format_slide_notes(metadata)
+  lines <- strsplit(result, "\n")[[1]]
+
+  expect_equal(lines[1], "Source: scripts/01-pk.R 2026-04-20 12:00:00")
+})
+
+test_that("format_slide_notes legacy fallback uses path+time when type absent", {
+  metadata <- list(
+    source_meta = list(
+      path = "scripts/run.R",
+      latest_time = "2026-01-15 10:30"
+    ),
+    object_meta = list(footnotes = list())
+  )
+
+  result <- format_slide_notes(metadata)
+  lines <- strsplit(result, "\n")[[1]]
+
+  expect_equal(lines[1], "Source: scripts/run.R 2026-01-15 10:30")
+})
+
+test_that("format_slide_notes shiny source -> N/A when app fields missing", {
+  metadata <- list(
+    source_meta = list(type = "shiny"),
+    object_meta = list(footnotes = list())
+  )
+
+  result <- format_slide_notes(metadata)
+  lines <- strsplit(result, "\n")[[1]]
+
+  expect_equal(lines[1], "Source: N/A")
 })

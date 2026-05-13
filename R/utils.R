@@ -386,6 +386,56 @@ load_image_metadata <- function(image_path) {
   })
 }
 
+#' Render the Source line text for slide notes
+#'
+#' @description Mirrors reportifyr's `_SOURCE_HANDLERS` dispatch on
+#'   `source_meta$type`:
+#'   \itemize{
+#'     \item `"shiny"` -> `"{app_name} v{app_version} {creation_time}"`
+#'     \item `"script"` -> `"{path} {latest_time}"`
+#'     \item legacy (no `type` field) -> path+latest_time or `text`
+#'   }
+#'   Returns an empty string when nothing is resolvable.
+#'
+#' @param src List from `metadata$source_meta`.
+#' @param obj List from `metadata$object_meta` (used for shiny's
+#'   creation_time).
+#'
+#' @return Character scalar, possibly empty.
+#' @keywords internal
+#' @noRd
+format_source_line <- function(src, obj = NULL) {
+  if (!is.list(src)) return("")
+  obj <- obj %||% list()
+  src_type <- src$type
+  if (identical(src_type, "shiny")) {
+    app_name    <- src$app_name    %||% ""
+    app_version <- src$app_version %||% ""
+    creation    <- obj$creation_time %||% ""
+    if (nzchar(app_name) && nzchar(app_version)) {
+      return(trimws(paste0(app_name, " v", app_version, " ", creation)))
+    }
+    return("")
+  }
+  if (identical(src_type, "script")) {
+    path        <- src$path        %||% ""
+    latest_time <- src$latest_time %||% ""
+    if (nzchar(path)) {
+      return(trimws(paste0(path, " ", latest_time)))
+    }
+    return("")
+  }
+  ## Legacy / no type discriminator
+  if (nzchar(src$text %||% "")) return(as.character(src$text))
+  path        <- src$path        %||% ""
+  latest_time <- src$latest_time %||% ""
+  if (nzchar(path) && nzchar(latest_time)) {
+    return(paste0(path, " ", latest_time))
+  }
+  if (nzchar(path)) return(path)
+  ""
+}
+
 #' Format slide notes with metadata
 #'
 #' @param metadata A list containing the metadata
@@ -406,14 +456,11 @@ format_slide_notes <- function(metadata,
                                figure_footnotes = NULL) {
   lines <- character()
 
-  source_path <- metadata$source_meta$path %||% ""
-  source_time <- metadata$source_meta$latest_time %||% ""
-  if (nzchar(source_path) && nzchar(source_time)) {
-    lines <- c(lines, paste0(
-      "Source: ", source_path, " ", source_time
-    ))
-  } else if (nzchar(source_path)) {
-    lines <- c(lines, paste0("Source: ", source_path))
+  source_text <- format_source_line(
+    metadata$source_meta, metadata$object_meta
+  )
+  if (nzchar(source_text)) {
+    lines <- c(lines, paste0("Source: ", source_text))
   } else {
     lines <- c(lines, "Source: N/A")
   }
