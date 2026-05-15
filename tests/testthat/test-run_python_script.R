@@ -1,8 +1,8 @@
-test_that("run_python_script returns fyrstartr result on success", {
-  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
+test_that("run_python_script returns pyro result on success", {
+  mockery::stub(run_python_script, "pyro::get_venv_uv_paths", function() {
     list(venv = "/fake/venv", uv = "/fake/uv")
   })
-  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(...) {
+  mockery::stub(run_python_script, "pyro::run_python_script", function(...) {
     list(stdout = "done", stderr = "", status = 0)
   })
 
@@ -14,12 +14,12 @@ test_that("run_python_script returns fyrstartr result on success", {
 })
 
 test_that("run_python_script prepends 'run' to script_args", {
-  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
+  mockery::stub(run_python_script, "pyro::get_venv_uv_paths", function() {
     list(venv = "/fake/venv", uv = "/fake/uv")
   })
 
   captured_args <- NULL
-  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(uv_path, args, ...) {
+  mockery::stub(run_python_script, "pyro::run_python_script", function(uv_path, args, ...) {
     captured_args <<- args
     list(stdout = "", stderr = "", status = 0)
   })
@@ -31,13 +31,13 @@ test_that("run_python_script prepends 'run' to script_args", {
   expect_equal(captured_args[3], "-f")
 })
 
-test_that("run_python_script forwards venv/uv paths and a stderr_callback to fyrstartr", {
-  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
+test_that("run_python_script forwards venv/uv paths and a stderr_callback to pyro", {
+  mockery::stub(run_python_script, "pyro::get_venv_uv_paths", function() {
     list(venv = "/my/venv", uv = "/my/uv")
   })
 
   captured <- list()
-  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(uv_path, args, venv_path, script_name, pythonpath, stderr_callback, ...) {
+  mockery::stub(run_python_script, "pyro::run_python_script", function(uv_path, args, venv_path, script_name, pythonpath, stderr_callback, ...) {
     captured <<- list(
       uv_path = uv_path,
       venv_path = venv_path,
@@ -58,12 +58,12 @@ test_that("run_python_script forwards venv/uv paths and a stderr_callback to fyr
 })
 
 test_that("run_python_script's stderr callback filters console by PRFY_VERBOSE", {
-  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
+  mockery::stub(run_python_script, "pyro::get_venv_uv_paths", function() {
     list(venv = "/my/venv", uv = "/my/uv")
   })
 
   cb_holder <- list(cb = NULL)
-  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(stderr_callback, ...) {
+  mockery::stub(run_python_script, "pyro::run_python_script", function(stderr_callback, ...) {
     cb_holder$cb <<- stderr_callback
     list(stdout = "", stderr = "", status = 0)
   })
@@ -85,10 +85,10 @@ test_that("run_python_script's stderr callback filters console by PRFY_VERBOSE",
 })
 
 test_that("run_python_script error includes label but not internal paths", {
-  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
+  mockery::stub(run_python_script, "pyro::get_venv_uv_paths", function() {
     list(venv = "/fake/venv", uv = "/fake/uv")
   })
-  mockery::stub(run_python_script, "fyrstartr::run_python_script", function(...) {
+  mockery::stub(run_python_script, "pyro::run_python_script", function(...) {
     stop("Add images failed.", call. = FALSE)
   })
 
@@ -110,7 +110,7 @@ test_that("run_python_script error includes label but not internal paths", {
 })
 
 test_that("run_python_script propagates error when venv paths cannot be resolved", {
-  mockery::stub(run_python_script, "fyrstartr::get_venv_uv_paths", function() {
+  mockery::stub(run_python_script, "pyro::get_venv_uv_paths", function() {
     stop("Create virtual environment with initialize_python")
   })
 

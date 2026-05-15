@@ -12,16 +12,16 @@ initialize_app(verbose = TRUE)
 \value{
 Invisibly a list:
 \itemize{
-\item \code{success}: Logical. \code{TRUE} iff fyrstartr returned without error.
+\item \code{success}: Logical. \code{TRUE} iff pyro returned without error.
 \item \code{errors}: Character vector of any error detail captured.
 }
 }
 \description{
 Bootstraps the Python environment presentifyr's Shiny app needs by
-calling \code{fyrstartr::initialize_python(groups = "presentifyr")}. This
+calling \code{pyro::initialize_python(groups = "presentifyr")}. This
 installs uv (if missing) and additively syncs the \code{presentifyr}
 dependency group (python-pptx, pillow) into \verb{.venv/} from the
-fyrstartr-bundled lockfile. The sync runs in \code{--inexact} mode, so any
+pyro-bundled lockfile. The sync runs in \code{--inexact} mode, so any
 packages already present in the venv from prior fyr-package installs
 are left in place.
 

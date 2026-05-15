@@ -22,7 +22,7 @@ Imports:
     cli,
     jsonlite,
     fs (>= 1.6.4),
-    fyrstartr,
+    pyro,
     gert (>= 2.1.0),
     here (>= 1.0.1),
     htmltools,

@@ -26,9 +26,9 @@ validate_pptx_file <- function(file_path) {
   }
 }
 
-#' Run a Python script via uv using the fyrstartr-managed venv
+#' Run a Python script via uv using the pyro-managed venv
 #'
-#' Thin wrapper over [fyrstartr::run_python_script()] that resolves the
+#' Thin wrapper over [pyro::run_python_script()] that resolves the
 #' venv/uv paths, exposes presentifyr's `inst/scripts/` on `PYTHONPATH`,
 #' and surfaces a clean error message without leaking subprocess paths.
 #'
@@ -36,11 +36,11 @@ validate_pptx_file <- function(file_path) {
 #'   Typically c(script_path, "-flag", value, ...).
 #' @param label Short label for error messages (e.g. "Add images", "Sync images").
 #'
-#' @return The result from [fyrstartr::run_python_script()].
+#' @return The result from [pyro::run_python_script()].
 #' @keywords internal
 #' @noRd
 run_python_script <- function(script_args, label) {
-  paths <- fyrstartr::get_venv_uv_paths()
+  paths <- pyro::get_venv_uv_paths()
   venv_path <- paths$venv
   uv_path <- paths$uv
   log4r::debug(.le$logger, paste("run_python_script: venv =", venv_path))
@@ -76,7 +76,7 @@ run_python_script <- function(script_args, label) {
   }
 
   tryCatch(
-    fyrstartr::run_python_script(
+    pyro::run_python_script(
       uv_path = uv_path,
       args = c("run", script_args),
       venv_path = venv_path,

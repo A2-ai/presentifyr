@@ -2,10 +2,10 @@
 #'
 #' @description
 #' Bootstraps the Python environment presentifyr's Shiny app needs by
-#' calling `fyrstartr::initialize_python(groups = "presentifyr")`. This
+#' calling `pyro::initialize_python(groups = "presentifyr")`. This
 #' installs uv (if missing) and additively syncs the `presentifyr`
 #' dependency group (python-pptx, pillow) into `.venv/` from the
-#' fyrstartr-bundled lockfile. The sync runs in `--inexact` mode, so any
+#' pyro-bundled lockfile. The sync runs in `--inexact` mode, so any
 #' packages already present in the venv from prior fyr-package installs
 #' are left in place.
 #'
@@ -18,7 +18,7 @@
 #'
 #' @return Invisibly a list:
 #'   \itemize{
-#'     \item \code{success}: Logical. `TRUE` iff fyrstartr returned without error.
+#'     \item \code{success}: Logical. `TRUE` iff pyro returned without error.
 #'     \item \code{errors}: Character vector of any error detail captured.
 #'   }
 #'
@@ -40,8 +40,8 @@ initialize_app <- function(verbose = TRUE) {
 
   tryCatch(
     {
-      fyrstartr::write_group_to_pyproject("presentifyr")
-      fyrstartr::initialize_python(groups = "presentifyr")
+      pyro::write_group_to_pyproject("presentifyr")
+      pyro::initialize_python(groups = "presentifyr")
       status$success <- TRUE
     },
     error = function(e) {
