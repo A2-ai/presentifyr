@@ -228,52 +228,21 @@ parse_directory_for_images <- function(directory,
 
 #' Get the configured report directory for this project
 #'
-#' Reads the `.{report_dir}_init.json` file written by
-#' `reportifyr::initialize_report_project()` to find the configured
-#' report directory name. Falls back to `<project>/report` when no
-#' init file is present or readable.
+#' Resolves to `<project>/<options("presentifyr.report_dir_name")>`,
+#' defaulting to `<project>/report` when the option is unset.
 #'
 #' @return Absolute path to the report directory.
 #' @keywords internal
 #' @noRd
 get_report_dir <- function() {
-  project_dir <- get_project_dir()
-  init_files <- list.files(
-    project_dir,
-    pattern = "^\\..+_init\\.json$",
-    full.names = TRUE,
-    all.files = TRUE
-  )
-
-  if (length(init_files) == 0) {
-    return(file.path(project_dir, "report"))
-  }
-
-  if (length(init_files) > 1) {
-    log4r::warn(.le$logger, paste0(
-      "get_report_dir: multiple init files found, using ",
-      basename(init_files[1])
-    ))
-  }
-
-  tryCatch({
-    init <- jsonlite::read_json(init_files[1], simplifyVector = TRUE)
-    report_dir_name <- init$config$report_dir_name %||% "report"
-    file.path(project_dir, report_dir_name)
-  }, error = function(e) {
-    log4r::warn(.le$logger, paste0(
-      "get_report_dir: failed to parse ",
-      basename(init_files[1]), " - ", e$message
-    ))
-    file.path(project_dir, "report")
-  })
+  file.path(get_project_dir(), getOption("presentifyr.report_dir_name", "report"))
 }
 
 #' Load abbreviation definitions from a YAML file
 #'
 #' @param yaml_path The file path to the abbreviations YAML. Default is
 #'   NULL. If NULL, uses `<report_dir>/standard_footnotes.yaml` where
-#'   `report_dir` is discovered from the reportifyr init file.
+#'   `report_dir` is resolved by [get_report_dir()].
 #'
 #' @return A named list mapping abbreviation keys to full forms, or an
 #'   empty list if the YAML is missing or malformed.

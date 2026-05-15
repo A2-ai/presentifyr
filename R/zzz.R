@@ -51,6 +51,17 @@ presentifyr_options_message <- function() {
     set_options <- c(set_options, paste("presentifyr.exclude_dirs:", paste(exclude_dirs, collapse = ", ")))
   }
 
+  ## Report dir
+  report_dir <- getOption("presentifyr.report_dir_name")
+  if (is.null(report_dir)) {
+    project_options <- c(
+      project_options,
+      "Using 'report' as report directory, set options('presentifyr.report_dir_name') to change"
+    )
+  } else {
+    set_options <- c(set_options, paste("presentifyr.report_dir_name:", report_dir))
+  }
+
   ## Format .onAttach message
   msg <- ""
   if (length(set_options)) {
