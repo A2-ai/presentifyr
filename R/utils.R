@@ -242,7 +242,7 @@ get_report_dir <- function() {
 #'
 #' @param yaml_path The file path to the abbreviations YAML. Default is
 #'   NULL. If NULL, uses `<report_dir>/standard_footnotes.yaml` where
-#'   `report_dir` is resolved by [get_report_dir()].
+#'   `report_dir` is resolved by `get_report_dir()`.
 #'
 #' @return A named list mapping abbreviation keys to full forms, or an
 #'   empty list if the YAML is missing or malformed.
