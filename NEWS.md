@@ -1,3 +1,19 @@
+# presentifyr 0.3.0
+
+## Improvements
+
+* Python environment management now goes through the `pyro`
+  package. `initialize_app()` is unchanged from
+  a caller's perspective — reinstall `presentifyr` to pick up the new
+  dependency.
+* `meta_type` keys in image metadata are decoded against
+  `figure_footnotes` / `table_footnotes` in `standard_footnotes.yaml`
+  and prepended to the Notes line.
+* Report directory is configured via
+  `options("presentifyr.report_dir_name")` (default `"report"`) rather
+  than discovered through reportifyr's init JSON. Projects with a
+  non-default report directory name should set this option.
+
 # presentifyr 0.2.1
 
 ## Improvements
