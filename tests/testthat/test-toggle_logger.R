@@ -49,6 +49,9 @@ test_that("toggle_logger rejects invalid verbosity levels with descriptive error
 })
 
 test_that("toggle_logger rejects empty string verbosity", {
+  ## Windows process env can't hold an existing-but-empty variable —
+  ## setting to "" unsets it, so this case is unreachable there.
+  skip_on_os("windows")
   withr::with_envvar(c("PRFY_VERBOSE" = ""), {
     expect_error(toggle_logger(), "Invalid verbosity level ''")
   })
