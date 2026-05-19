@@ -28,7 +28,6 @@ NULL
 presentifyr_options_message <- function() {
   set_options <- c()
   project_options <- c()
-  version_options <- c()
 
   ## Project dir
   project_dir <- getOption("project.dir")
@@ -52,15 +51,15 @@ presentifyr_options_message <- function() {
     set_options <- c(set_options, paste("presentifyr.exclude_dirs:", paste(exclude_dirs, collapse = ", ")))
   }
 
-  ## Version options
-  pptx_vers <- getOption("python-pptx.version")
-  if (is.null(pptx_vers)) {
-    version_options <- c(
-      version_options,
-      "Using python-pptx version 1.0.2, set options('python-pptx.version') to change"
+  ## Report dir
+  report_dir <- getOption("presentifyr.report_dir_name")
+  if (is.null(report_dir)) {
+    project_options <- c(
+      project_options,
+      "Using 'report' as report directory, set options('presentifyr.report_dir_name') to change"
     )
   } else {
-    set_options <- c(set_options, paste("python-pptx.version:", pptx_vers))
+    set_options <- c(set_options, paste("presentifyr.report_dir_name:", report_dir))
   }
 
   ## Format .onAttach message
@@ -88,19 +87,6 @@ presentifyr_options_message <- function() {
         cli::col_yellow(cli::symbol$square), " ", project_options,
         collapse = "\n"
       ), "\n"
-    )
-  }
-
-  if (length(version_options)) {
-    msg <- paste0(
-      msg,
-      cli::rule(
-        left = cli::style_bold("Version options")
-      ), "\n",
-      paste0(
-        cli::col_yellow(cli::symbol$square), " ", version_options,
-        collapse = "\n"
-      )
     )
   }
 

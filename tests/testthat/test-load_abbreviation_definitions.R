@@ -40,25 +40,23 @@ test_that("load_abbreviation_definitions returns empty list when abbreviations k
   expect_equal(result, list())
 })
 
-test_that("load_abbreviation_definitions resolves path via init file when yaml_path is NULL", {
+test_that("load_abbreviation_definitions resolves path via report_dir option when yaml_path is NULL", {
   dir <- tempfile()
   dir.create(dir)
   report_dir <- file.path(dir, "custom_reports")
   dir.create(report_dir)
 
-  jsonlite::write_json(
-    list(config = list(report_dir_name = "custom_reports")),
-    file.path(dir, ".custom_reports_init.json"),
-    auto_unbox = TRUE
-  )
   writeLines(
     c("abbreviations:", "  CI: confidence interval"),
     file.path(report_dir, "standard_footnotes.yaml")
   )
 
-  withr::with_options(list(project.dir = dir), {
-    result <- load_abbreviation_definitions()
-  })
+  withr::with_options(
+    list(project.dir = dir, presentifyr.report_dir_name = "custom_reports"),
+    {
+      result <- load_abbreviation_definitions()
+    }
+  )
   expect_equal(result$CI, "confidence interval")
 })
 

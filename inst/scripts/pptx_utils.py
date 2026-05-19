@@ -94,42 +94,110 @@ def decode_abbreviations(abbrev_list, definitions=None):
     return ', '.join(parts) + '.'
 
 
-def format_slide_notes(metadata, abbreviation_definitions=None):
+def _format_source_line(src, obj):
+    """Render the Source line. Mirrors reportifyr's _SOURCE_HANDLERS:
+    shiny -> "{app_name} v{app_version} {creation_time}"
+    script -> "{path} {latest_time}"
+    legacy (no type) -> path+latest_time or `text` verbatim
+    Returns '' when nothing is resolvable.
+    """
+    if not isinstance(src, dict):
+        return ''
+    obj = obj or {}
+    src_type = src.get('type')
+    if src_type == 'shiny':
+        app_name = src.get('app_name', '')
+        app_version = src.get('app_version', '')
+        creation = obj.get('creation_time', '')
+        if app_name and app_version:
+            return f"{app_name} v{app_version} {creation}".strip()
+        return ''
+    if src_type == 'script':
+        path = src.get('path', '')
+        latest_time = src.get('latest_time', '')
+        if path:
+            return f"{path} {latest_time}".strip()
+        return ''
+    # Legacy / no type discriminator
+    text = src.get('text')
+    if isinstance(text, str) and text:
+        return text
+    path = src.get('path', '')
+    latest_time = src.get('latest_time', '')
+    if path and latest_time:
+        return f"{path} {latest_time}"
+    if path:
+        return path
+    return ''
+
+
+def format_slide_notes(
+    metadata, abbreviation_definitions=None, meta_type_definitions=None
+):
     """Format slide notes with metadata.
 
     Args:
         metadata: dict containing the metadata (from load_metadata_for_image)
         abbreviation_definitions: dict mapping abbreviation keys to
             their full forms. If None, raw keys are displayed.
+        meta_type_definitions: dict mapping `meta_type` keys to
+            footnote text, built from the merged `figure_footnotes`
+            and `table_footnotes` sections of standard_footnotes.yaml.
+            When the metadata's object_meta.meta_type is set and not
+            "NA", the resolved text is prepended to Notes. Raises
+            KeyError if meta_type is set but missing from this dict.
 
     Returns:
         Formatted string for slide notes
     """
     lines = []
 
-    # Source: source_meta.path + source_meta.latest_time
+    # Source line dispatches on source_meta.type (shiny/script/legacy)
     source_meta = metadata.get('source_meta', {})
-    source_path = source_meta.get('path', '')
-    source_time = source_meta.get('latest_time', '')
-
-    if source_path and source_time:
-        lines.append(f"Source: {source_path} {source_time}")
-    elif source_path:
-        lines.append(f"Source: {source_path}")
+    object_meta_for_src = metadata.get('object_meta', {}) or {}
+    source_text = _format_source_line(source_meta, object_meta_for_src)
+    if source_text:
+        lines.append(f"Source: {source_text}")
     else:
         lines.append("Source: N/A")
 
-    # Notes: object_meta.footnotes.notes (joined with ". ")
+    # meta_type lookup -> prepended to Notes
     object_meta = metadata.get('object_meta', {})
     footnotes = object_meta.get('footnotes', {})
-    notes_list = footnotes.get('notes', [])
+    meta_type = object_meta.get('meta_type')
+    meta_type_text = ''
+    if isinstance(meta_type, str) and meta_type and meta_type != 'NA':
+        mt_defs = meta_type_definitions or {}
+        if meta_type not in mt_defs:
+            raise KeyError(
+                f"meta_type '{meta_type}' not found in figure_footnotes "
+                f"or table_footnotes sections of footnotes YAML"
+            )
+        resolved = mt_defs[meta_type]
+        if isinstance(resolved, str):
+            # Right-trim before checking trailing period: YAML folded
+            # scalars can leave a trailing space after the period.
+            resolved = resolved.rstrip()
+            if resolved:
+                meta_type_text = (
+                    f"{resolved} "
+                    if resolved.endswith('.')
+                    else f"{resolved}. "
+                )
 
+    # Notes: meta_type text + object_meta.footnotes.notes (joined with ". ")
+    notes_list = footnotes.get('notes', [])
+    user_notes_text = ''
     if notes_list and any(n for n in notes_list if n):
-        notes_text = ' '.join(
+        normalized = (n.rstrip() for n in notes_list if n)
+        user_notes_text = ' '.join(
             n if n.endswith('.') else f"{n}."
-            for n in notes_list if n
+            for n in normalized if n
         )
-        lines.append(f"Notes: {notes_text}")
+
+    combined_notes = f"{meta_type_text}{user_notes_text}"
+    if combined_notes:
+        lines.append(f"Notes: {combined_notes}")
     else:
         lines.append("Notes: N/A")
 

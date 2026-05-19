@@ -1,6 +1,6 @@
 Package: presentifyr
 Title: PowerPoint Precision, Shiny Simplicity
-Version: 0.2.1
+Version: 0.3.0
 Authors@R: 
     c(
     person("Jacob", "Dumbleton", , "jacob@a2-ai.com", role = c("aut", "cre")),
@@ -22,14 +22,13 @@ Imports:
     cli,
     jsonlite,
     fs (>= 1.6.4),
+    pyro,
     gert (>= 2.1.0),
     here (>= 1.0.1),
     htmltools,
     jsTreeR (>= 2.6.0),
     log4r,
     pkglite (>= 0.2.2),
-    processx (>= 3.8.4),
-    reportifyr,
     rlang,
     yaml,
     shiny (>= 1.8.1.1),
