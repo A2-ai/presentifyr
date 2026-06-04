@@ -18,7 +18,7 @@ RoxygenNote: 7.3.3
 Depends: 
     R (>= 2.10)
 Imports:
-    bslib (>= 0.7.0),
+    bslib (>= 0.10.0),
     cli,
     jsonlite,
     fs (>= 1.6.4),

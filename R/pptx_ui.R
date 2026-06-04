@@ -6,8 +6,7 @@ pptx_ui <- function(id) {
   bslib::page_sidebar(
     htmltools::tags$head(
       htmltools::tags$link(rel = "stylesheet", type = "text/css", href = "presentifyr/resize-sidebar.css"),
-      htmltools::tags$link(rel = "stylesheet", type = "text/css", href = "presentifyr/modal-styles.css"),
-      htmltools::tags$script(src = "presentifyr/resize-sidebar.js")
+      htmltools::tags$link(rel = "stylesheet", type = "text/css", href = "presentifyr/modal-styles.css")
     ),
     theme = theme,
     sidebar = bslib::sidebar(

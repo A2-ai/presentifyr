@@ -8,6 +8,15 @@
   (`options("project.dir")`, falling back to `here::here()`) rather than
   the working directory.
 
+## Bug fixes
+
+* Main-panel content is centered again under bslib >= 0.10, which gives
+  `.bslib-page-main` a 576px `min-width` that previously overflowed the
+  panel on narrow viewports.
+* Sidebar resizing works again. The custom resize handle predated bslib's
+  native (keyboard-accessible) sidebar resize and was overriding its grid;
+  it has been removed in favour of the built-in handle.
+
 # presentifyr 0.3.0
 
 ## Improvements
