@@ -584,14 +584,6 @@ pptx_server <- function(id) {
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       # 7. Create initial PPTX with add_images
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      shiny::observe({
-        tryCatch({
-          gert::git_remote_info()$url
-        }, error = function(e) {
-          shiny::showModal(shiny::modalDialog("No remote repositories found. Please set before using app.", footer = NULL))
-        })
-      })
-
       output$button <- shiny::renderUI({
         shiny::req(selected_items())
         files_selected <- length(selected_items()) > 0
