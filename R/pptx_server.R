@@ -2,7 +2,7 @@
 pptx_server <- function(id) {
   selected_items <- treeNavigatorServer(
     id,
-    rootFolder = getwd(),
+    rootFolder = get_project_dir(),
     search = FALSE,
     pattern = include_imgs(),
     all.files = FALSE
@@ -610,7 +610,7 @@ pptx_server <- function(id) {
           if (startsWith(f, "/") || grepl("^[A-Za-z]:", f)) {
             f
           } else {
-            file.path(getwd(), f)
+            file.path(get_project_dir(), f)
           }
         }, character(1), USE.NAMES = FALSE)
         rv$pending_files <- files
@@ -1137,7 +1137,7 @@ pptx_server <- function(id) {
           ## Resolve to absolute paths for resource registration
           abs_files <- vapply(files, function(f) {
             if (startsWith(f, "/") || grepl("^[A-Za-z]:", f)) f
-            else file.path(getwd(), f)
+            else file.path(get_project_dir(), f)
           }, character(1), USE.NAMES = FALSE)
 
           ## Register resource paths for image thumbnails
