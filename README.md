@@ -19,10 +19,7 @@ the deck with up-to-date content.
 
 - **R (\>= 4.0).**
 - **A [reportifyr](https://github.com/A2-ai/reportifyr)-initialized
-  project** — see [Setting the Stage](#setting-the-stage) for the
-  layout `presentifyr` reads.
-- **A remote Git repository for the project.** `presentifyr` checks for
-  a configured remote on launch and will refuse to start without one.
+  project is recommended** — for additional features. See [Setting the Stage](#setting-the-stage).
 - **Image files only** (`.png`, `.jpg`, etc.) — PDFs are not supported.
 
 ## Setting the Stage

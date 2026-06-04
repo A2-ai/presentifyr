@@ -1,3 +1,13 @@
+# presentifyr 0.3.1
+
+## Improvements
+
+* The app no longer requires a configured Git remote to launch; `gert`
+  is dropped as a dependency.
+* The file tree now roots at the configured project directory
+  (`options("project.dir")`, falling back to `here::here()`) rather than
+  the working directory.
+
 # presentifyr 0.3.0
 
 ## Improvements
