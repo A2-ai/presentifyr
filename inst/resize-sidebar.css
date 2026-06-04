@@ -19,10 +19,12 @@
 
 /* Propagate shrinking past intermediate bslib flex-item layers so the
  * rendered Shiny output (.shiny-html-output) centers against .main's
- * visible width instead of inheriting a min-content size wider than .main. */
+ * visible width instead of inheriting a min-content size wider than .main.
+ * `!important` is required to override bslib's own min-width on
+ * `.bslib-page-main` (576px, the `sm` breakpoint, in bslib >= 0.9). */
 .bslib-sidebar-layout > .main .bslib-page-main,
 .bslib-sidebar-layout > .main .shiny-html-output {
-  min-width: 0;
+  min-width: 0 !important;
   max-width: 100%;
 }
 
