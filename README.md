@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# presentifyr <a href="https://github.com/a2-ai/presentifyr/"><img src="inst/www/logo.png" align="right" height="139" alt="presentifyr website" /></a>
+# presentifyr <a href="https://github.com/a2-ai/presentifyr/"><img src="man/figures/logo.png" align="right" height="139" alt="presentifyr website" /></a>
 
 <!-- badges: start -->
 
