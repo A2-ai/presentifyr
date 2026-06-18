@@ -13,7 +13,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# presentifyr <a href="https://github.com/a2-ai/presentifyr/"><img src="inst/www/logo.png" align="right" height="139" alt="presentifyr website" /></a>
+# presentifyr <a href="https://github.com/a2-ai/presentifyr/"><img src="man/figures/logo.png" align="right" height="139" alt="presentifyr website" /></a>
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/A2-ai/presentifyr/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/A2-ai/presentifyr/actions/workflows/R-CMD-check.yaml)
