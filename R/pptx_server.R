@@ -122,10 +122,13 @@ pptx_server <- function(id) {
         shiny::removeModal()
       })
 
-      ## Render filename input with conditional clear button
+      ## Render filename input with conditional clear button.
+      ## Depends only on the modal key so typing (which updates rv$report_filename
+      ## on Shiny's debounce) cannot rebuild the input and steal focus mid-entry.
       output$filename_input_ui <- shiny::renderUI({
-        current_value <- if (!is.null(rv$report_filename)) rv$report_filename else ""
-        has_value <- nzchar(current_value)
+        rv$config_modal_key
+        saved_value <- shiny::isolate(rv$report_filename)
+        current_value <- if (!is.null(saved_value)) saved_value else ""
 
         htmltools::tags$div(
           class = "form-group shiny-input-container",
@@ -142,13 +145,16 @@ pptx_server <- function(id) {
               value = current_value,
               placeholder = "presentation"
             ),
-            if (has_value) {
+            ## Shown/hidden client-side so the input itself is never re-rendered
+            shiny::conditionalPanel(
+              condition = "input.pptx_filename != ''",
+              ns = ns,
               shiny::actionButton(
                 ns("clear_filename"),
                 htmltools::tags$i(class = "fa fa-times"),
                 class = "btn-clear-input"
               )
-            }
+            )
           )
         )
       })
@@ -156,6 +162,7 @@ pptx_server <- function(id) {
       ## Clear filename button
       shiny::observeEvent(input$clear_filename, {
         rv$report_filename <- ""
+        shiny::updateTextInput(session, "pptx_filename", value = "")
       })
 
       shiny::observeEvent(input$pptx_filename, {
