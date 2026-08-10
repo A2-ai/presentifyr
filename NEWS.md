@@ -1,3 +1,13 @@
+# presentifyr 0.3.2
+
+## Bug fixes
+
+* Typing a PowerPoint file name in the configuration modal no longer loses
+  focus when you pause. The input's `renderUI` depended on the reactive value
+  that typing updates, so each debounced keystroke rebuilt the input and
+  committed the partial name; it now renders once per modal open and toggles
+  the clear button client-side.
+
 # presentifyr 0.3.1
 
 ## Improvements
